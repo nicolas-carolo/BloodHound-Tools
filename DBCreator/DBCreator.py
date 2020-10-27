@@ -21,6 +21,10 @@ from collections import defaultdict
 import uuid
 import time
 
+from entities.groups import get_forest_standard_groups_list, get_forest_standard_group_members_list
+from entities.users import get_guest_user
+
+
 
 class Messages():
     def title(self):
@@ -28,8 +32,10 @@ class Messages():
         print("BloodHound Sample Database Creator")
         print("================================================================")
 
+
     def input_default(self, prompt, default):
         return input("%s [%s] " % (prompt, default)) or default
+
 
     def input_yesno(self, prompt, default):
         temp = input(prompt + " " + ("Y" if default else "y") + "/" + ("n" if default else "N") + " ")
@@ -40,7 +46,9 @@ class Messages():
         return default
 
 
+
 class MainMenu(cmd.Cmd):
+
     def __init__(self):
         self.m = Messages()
         self.url = "bolt://localhost:7687"
@@ -61,6 +69,7 @@ class MainMenu(cmd.Cmd):
 
         cmd.Cmd.__init__(self)
 
+
     def cmdloop(self):
         while True:
             self.m.title()
@@ -72,30 +81,39 @@ class MainMenu(cmd.Cmd):
                     self.driver.close()
                 raise KeyboardInterrupt
 
+
     def help_dbconfig(self):
         print("Configure database connection parameters")
+
 
     def help_connect(self):
         print("Test connection to the database and verify credentials")
 
+ 
     def help_setnodes(self):
         print("Set base number of nodes to generate (default 500)")
 
+ 
     def help_setdomain(self):
         print("Set domain name (default 'TESTLAB.LOCAL')")
 
+ 
     def help_cleardb(self):
         print("Clear the database and set constraints")
 
+ 
     def help_generate(self):
         print("Generate random data")
 
+ 
     def help_clear_and_generate(self):
         print("Connect to the database, clear the db, set the schema, and generate random data")
 
+ 
     def help_exit(self):
         print("Exits the database creator")
 
+ 
     def do_dbconfig(self, args):
         print("Current Settings:")
         print("DB Url: {}".format(self.url))
@@ -121,6 +139,7 @@ class MainMenu(cmd.Cmd):
         print("Testing DB Connection")
         self.test_db_conn()
 
+ 
     def do_setnodes(self, args):
         passed = args
         if passed != "":
@@ -146,6 +165,7 @@ class MainMenu(cmd.Cmd):
                 return
             """
 
+ 
     def do_setdomain(self, args):
         passed = args
         if passed != "":
@@ -160,11 +180,14 @@ class MainMenu(cmd.Cmd):
         print("New Settings:")
         print("Domain: {}".format(self.domain))
 
+
     def do_exit(self, args):
         raise KeyboardInterrupt
 
+ 
     def do_connect(self, args):
         self.test_db_conn()
+
 
     def do_cleardb(self, args):
         if not self.connected:
@@ -174,25 +197,6 @@ class MainMenu(cmd.Cmd):
         print("Clearing Database")
         d = self.driver
         session = d.session()
-        """
-        num = 1
-        while num > 0:
-            result = session.run(
-                "MATCH (n) WITH n LIMIT 10000 DETACH DELETE n RETURN count(n)")
-            for r in result:
-                num = int(r['count(n)'])
-
-        print("Resetting Schema")
-        for constraint in session.run("CALL db.constraints"):
-            session.run("DROP {}".format(constraint['description']))
-
-        for index in session.run("CALL db.indexes"):
-            session.run("DROP {}".format(index['description']))
-
-        session.run(
-            "CREATE CONSTRAINT id_constraint ON (c:Base) ASSERT c.objectid IS UNIQUE")
-        session.run("CREATE INDEX name_index FOR (n:Base) ON (n.name)")
-        """
 
         session.run("match (a) -[r] -> () delete a, r")
         session.run("match (a) delete a")
@@ -200,6 +204,7 @@ class MainMenu(cmd.Cmd):
         session.close()
 
         print("DB Cleared and Schema Set")
+
 
     def test_db_conn(self):
         self.connected = False
@@ -214,14 +219,17 @@ class MainMenu(cmd.Cmd):
             self.connected = False
             print("Database Connection Failed. Check your settings.")
 
+
     def do_generate(self, args):
         self.generate_data()
+
 
     def do_clear_and_generate(self, args):
         self.test_db_conn()
         self.do_cleardb("a")
         self.generate_data()
 
+ 
     def split_seq(self, iterable, size):
         it = iter(iterable)
         item = list(itertools.islice(it, size))
@@ -229,6 +237,7 @@ class MainMenu(cmd.Cmd):
             yield item
             item = list(itertools.islice(it, size))
 
+ 
     def generate_timestamp(self):
         choice = random.randint(-1, 1)
         if choice == 1:
@@ -237,6 +246,7 @@ class MainMenu(cmd.Cmd):
         else:
             return choice
 
+ 
     def generate_data(self):
         if not self.connected:
             print("Not connected to database. Use connect first")
@@ -268,6 +278,7 @@ class MainMenu(cmd.Cmd):
 
         print("Starting data generation with nodes={}".format(self.num_nodes))
 
+        """
         print("Populating Standard Nodes")
         base_statement = "MERGE (n:Base {name: $gname}) SET n:Group, n.objectid=$sid"
         session.run(f"{base_statement},n.highvalue=true",
@@ -284,6 +295,70 @@ class MainMenu(cmd.Cmd):
                     gname=cn("ADMINISTRATORS"), sid=cs(544))
         session.run(f"{base_statement},n.highvalue=true",
                     gname=cn("ENTERPRISE ADMINS"), sid=cs(519))
+        """
+
+        
+        standard_groups_list = get_forest_standard_groups_list(self.domain, self.base_sid)
+        for standard_group in standard_groups_list:
+            try:
+                session.run(
+                    """
+                    MERGE (n:Base {name: $gname}) SET n:Group, n.objectid=$sid,
+                    n.highvalue=$highvalue, n.domain=$domain,
+                    n.distinguishedname=$distinguishedname,
+                    n.description=$description, n.admincount=$admincount,
+                    n.default=true
+                    """,
+                    gname=standard_group["Properties"]["name"],
+                    sid=standard_group["ObjectIdentifier"],
+                    highvalue=standard_group["Properties"]["highvalue"],
+                    domain=standard_group["Properties"]["domain"],
+                    distinguishedname=standard_group["Properties"]["distinguishedname"],
+                    description=standard_group["Properties"]["description"],
+                    admincount=standard_group["Properties"]["admincount"]
+                )
+            except KeyError:
+                # print(standard_group)
+                standard_group_properties = standard_group["Properties"]
+                if not "highvalue" in standard_group_properties:
+                    highvalue = "null"
+                else:
+                    highvalue = standard_group["Properties"]["highvalue"]
+                if not "distinguishedname" in standard_group_properties:
+                    dn = "null"
+                else:
+                    dn = standard_group["Properties"]["distinguishedname"]
+                if not "description" in standard_group_properties:
+                    description = "null"
+                else:
+                    description = standard_group["Properties"]["description"]
+                if not "admincount" in standard_group_properties:
+                    admincount = "null"
+                else:
+                    admincount = standard_group["Properties"]["admincount"]
+                if not "domain" in standard_group_properties:
+                    domain = "null"
+                else:
+                    domain = standard_group["Properties"]["domain"]
+                session.run(
+                    """
+                    MERGE (n:Base {name: $gname}) SET n:Group, n.objectid=$sid,
+                    n.highvalue=$highvalue, n.domain=$domain,
+                    n.distinguishedname=$distinguishedname,
+                    n.description=$description, n.admincount=$admincount,
+                    n.default=true
+                    """,
+                    gname=standard_group["Properties"]["name"],
+                    sid=standard_group["ObjectIdentifier"],
+                    highvalue=highvalue,
+                    domain=domain,
+                    distinguishedname=dn,
+                    description=description,
+                    admincount=admincount
+                )
+                
+
+
         session.run(
             "MERGE (n:Base {name:$domain}) SET n:Domain, n.highvalue=true", domain=self.domain)
         ddp = str(uuid.uuid4())
@@ -393,6 +468,50 @@ class MainMenu(cmd.Cmd):
         used_states = list(set(used_states))
 
         print("Generating User Nodes")
+        guest_user = get_guest_user(self.domain, self.base_sid)
+        session.run(
+                    """
+                    MERGE (n:Base {name: $name}) SET n:User, n.objectid=$sid,
+                    n.highvalue=$highvalue, n.domain=$domain,
+                    n.distinguishedname=$distinguishedname,
+                    n.description=$description, n.admincount=$admincount,
+                    n.dontreqpreauth=$dontreqpreauth, n.passwordnotreqd=$passwordnotreqd,
+                    n.unconstraineddelegation=$unconstraineddelegation,
+                    n.sensitive=$sensitive, n.enabled=$enabled,
+                    n.pwdneverexpires=$pwdneverexpires, n.lastlogon=$lastlogon,
+                    n.lastlogontimestamp=$lastlogontimestamp, n.pwdlastset=$pwdlastset,
+                    n.serviceprincipalnames=$serviceprincipalnames, n.hasspn=$hasspn,
+                    n.displayname=$displayname, n.email=$email, n.title=$title,
+                    n.homedirectory=$homedirectory, n.userpassword=$userpassword,
+                    n.sidhistory=$sidhistory
+                    """,
+                    name=guest_user["Properties"]["name"],
+                    sid=guest_user["ObjectIdentifier"],
+                    highvalue=guest_user["Properties"]["highvalue"],
+                    domain=guest_user["Properties"]["domain"],
+                    distinguishedname=guest_user["Properties"]["distinguishedname"],
+                    description=guest_user["Properties"]["description"],
+                    admincount=guest_user["Properties"]["admincount"],
+                    dontreqpreauth=guest_user["Properties"]["dontreqpreauth"],
+                    passwordnotreqd=guest_user["Properties"]["passwordnotreqd"],
+                    unconstraineddelegation=guest_user["Properties"]["unconstraineddelegation"],
+                    sensitive=guest_user["Properties"]["sensitive"],
+                    enabled=random.choice([True, False]),
+                    pwdneverexpires=random.choice([True, False]),
+                    lastlogon=guest_user["Properties"]["lastlogon"],
+                    lastlogontimestamp=guest_user["Properties"]["lastlogontimestamp"],
+                    pwdlastset=guest_user["Properties"]["pwdlastset"],
+                    serviceprincipalnames=guest_user["Properties"]["serviceprincipalnames"],
+                    hasspn=guest_user["Properties"]["hasspn"],
+                    displayname=guest_user["Properties"]["displayname"],
+                    email=guest_user["Properties"]["email"],
+                    title=guest_user["Properties"]["title"],
+                    homedirectory=guest_user["Properties"]["homedirectory"],
+                    userpassword=guest_user["Properties"]["userpassword"],
+                    sidhistory=guest_user["Properties"]["sidhistory"]
+                )
+        
+
         current_time = int(time.time())
         group_name = "DOMAIN USERS@{}".format(self.domain)
         props = []
@@ -459,6 +578,13 @@ class MainMenu(cmd.Cmd):
             session.run(
                 'MERGE (n:User {name:$name}) WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (n)-[:MemberOf]->(m)', name=da, gname=cn("DOMAIN ADMINS"))
 
+        print("Adding members to standard groups")
+        standard_group_members_list = get_forest_standard_group_members_list(self.domain, self.base_sid)
+        for group_member in standard_group_members_list:
+            query = "MATCH (memberItem:" + group_member["MemberType"] + " {objectid: '" + group_member["MemberId"] + "'}), (groupItem:Group {objectid: '" + group_member["GroupId"] + "'})"
+            query = query + "\nMERGE (memberItem)-[:MemberOf]->(groupItem)"
+            session.run(query)
+
         print("Applying random group nesting")
         max_nest = int(round(math.log10(self.num_nodes)))
         props = []
@@ -492,7 +618,7 @@ class MainMenu(cmd.Cmd):
         variance = int(math.ceil(math.log10(self.num_nodes)))
         it_users = []
 
-        print("\n\nNUM GROUPS BASE:", num_groups_base)
+        # print("\n\nNUM GROUPS BASE:", num_groups_base)
 
         print("Calculated {} groups per user with a variance of - {}".format(num_groups_base, variance*2))
 
@@ -509,8 +635,8 @@ class MainMenu(cmd.Cmd):
             if (sample <= 1):
                 continue
 
-            print("\n\nPOSSIBLE GROUPS:\n", possible_groups)
-            print("\n\nSAMPLE:\n", sample)
+            # print("\n\nPOSSIBLE GROUPS:\n", possible_groups)
+            # print("\n\nSAMPLE:\n", sample)
             to_add = random.sample(possible_groups, sample)
 
             for group in to_add:
@@ -530,7 +656,7 @@ class MainMenu(cmd.Cmd):
         print("Adding local admin rights")
         it_groups = [x for x in groups if "IT" in x]
         random.shuffle(it_groups)
-        print("LEN IT_GROUPS:", len(it_groups))
+        # print("LEN IT_GROUPS:", len(it_groups))
         if len(it_groups) <= 4:
             max_lim = random.randint(1, len(it_groups) - 1)
         else:
