@@ -23,6 +23,7 @@ import time
 
 from entities.groups import get_forest_standard_groups_list, get_forest_standard_group_members_list
 from entities.users import get_guest_user, get_default_account, get_administrator_user
+from entities.acls import get_forest_group_aces_list
 
 
 
@@ -668,7 +669,6 @@ class MainMenu(cmd.Cmd):
         print("Adding members to standard groups")
         standard_group_members_list = get_forest_standard_group_members_list(self.domain, self.base_sid)
         for group_member in standard_group_members_list:
-            print(group_member)
             query = "MATCH (memberItem:" + group_member["MemberType"] + " {objectid: '" + group_member["MemberId"] + "'}), (groupItem:Group {objectid: '" + group_member["GroupId"] + "'})"
             query = query + "\nMERGE (memberItem)-[:MemberOf]->(groupItem)"
             session.run(query)
@@ -789,6 +789,13 @@ class MainMenu(cmd.Cmd):
 
         session.run(
             'UNWIND $props AS prop MERGE (n:Group {name:prop.a}) WITH n,prop MERGE (m:Computer {name:prop.b}) WITH n,m MERGE (n)-[:AdminTo]->(m)', props=props)
+
+        print("Adding ACLs for standard nodes")
+        group_aces_list = get_forest_group_aces_list(self.domain, self.base_sid)
+        for ace in group_aces_list:
+            query = "MATCH (identityReferenceItem:" + ace["IdentityReferenceType"] + " {objectid: '" + ace["IdentityReferenceId"] + "'}), (objectItem:" + ace["ObjectType"] + " {objectid: '" + ace["ObjectId"] + "'})"
+            query = query + "\nMERGE (identityReferenceItem)-[:" + ace["Right"] + " {isinherited: " + str(ace["IsInherited"]) + "}]->(objectItem)"
+            session.run(query)
 
         print("Adding RDP/ExecuteDCOM/AllowedToDelegateTo")
         count = int(math.floor(len(computers) * .1))
