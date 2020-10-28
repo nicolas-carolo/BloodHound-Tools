@@ -17,7 +17,7 @@ def get_forest_standard_group_members_list(domain_name, domain_sid):
             item = {
                 "GroupId": group["ObjectIdentifier"],
                 "GroupName": group["Properties"]["name"],
-                "MemberId": get_group_member_id(member["MemberId"], domain_sid),
+                "MemberId": get_group_member_id(member["MemberId"], domain_name, domain_sid),
                 "MemberType": member["MemberType"]
             }
             forest_members_list.append(item)
@@ -51,5 +51,7 @@ def set_group_attributes(group, domain_name, domain_sid):
     return group
 
 
-def get_group_member_id(member_id, domain_sid):
-    return str(member_id).replace("DOMAIN_SID", domain_sid)
+def get_group_member_id(member_id, domain_name, domain_sid):
+    member_id = str(member_id).replace("DOMAIN_SID", domain_sid)
+    member_id = str(member_id).replace("DOMAIN_NAME.DOMAIN_SUFFIX", str(domain_name).upper())
+    return member_id

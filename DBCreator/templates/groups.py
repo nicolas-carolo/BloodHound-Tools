@@ -2747,7 +2747,16 @@ STANDARD_GROUPS = [
         "description": "All domain users",
         "admincount": False
       },
-      "Members": [],
+      "Members": [
+        {
+          "MemberId": "DOMAIN_SID-503",
+          "MemberType": "User"
+        },
+        {
+          "MemberId": "DOMAIN_SID-500",
+          "MemberType": "User"
+        }
+      ],
       "ObjectIdentifier": "DOMAIN_SID-513",
       "Aces": [
         {
@@ -3520,6 +3529,24 @@ STANDARD_GROUPS = [
       },
       "Members": [],
       "ObjectIdentifier": "DOMAIN_NAME.DOMAIN_SUFFIX-S-1-5-32-545",
+      "Aces": []
+    },
+    {
+      "Properties": {
+        "name": "THIS ORGANIZATION@DOMAIN_NAME.DOMAIN_SUFFIX",
+        "domain": "DOMAIN_NAME.DOMAIN_SUFFIX"
+      },
+      "Members": [],
+      "ObjectIdentifier": "DOMAIN_NAME.DOMAIN_SUFFIX-S-1-5-17",
+      "Aces": []
+    },
+    {
+      "Properties": {
+        "name": "INTERACTIVE@DOMAIN_NAME.DOMAIN_SUFFIX",
+        "domain": "DOMAIN_NAME.DOMAIN_SUFFIX"
+      },
+      "Members": [],
+      "ObjectIdentifier": "DOMAIN_NAME.DOMAIN_SUFFIX-S-1-5-4",
       "Aces": []
     }
   ]

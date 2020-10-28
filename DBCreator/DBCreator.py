@@ -22,7 +22,7 @@ import uuid
 import time
 
 from entities.groups import get_forest_standard_groups_list, get_forest_standard_group_members_list
-from entities.users import get_guest_user
+from entities.users import get_guest_user, get_default_account, get_administrator_user
 
 
 
@@ -57,7 +57,7 @@ class MainMenu(cmd.Cmd):
         self.use_encryption = False
         self.driver = None
         self.connected = False
-        self.num_nodes = 500
+        self.num_nodes = 50
         self.domain = "TESTLAB.LOCAL"
         self.current_time = int(time.time())
         self.base_sid = "S-1-5-21-883232822-274137685-4173207997"
@@ -467,7 +467,7 @@ class MainMenu(cmd.Cmd):
 
         used_states = list(set(used_states))
 
-        print("Generating User Nodes")
+        print("Generating default User Nodes")
         guest_user = get_guest_user(self.domain, self.base_sid)
         session.run(
                     """
@@ -511,7 +511,94 @@ class MainMenu(cmd.Cmd):
                     sidhistory=guest_user["Properties"]["sidhistory"]
                 )
         
+        default_account = get_default_account(self.domain, self.base_sid)
+        session.run(
+                    """
+                    MERGE (n:Base {name: $name}) SET n:User, n.objectid=$sid,
+                    n.highvalue=$highvalue, n.domain=$domain,
+                    n.distinguishedname=$distinguishedname,
+                    n.description=$description, n.admincount=$admincount,
+                    n.dontreqpreauth=$dontreqpreauth, n.passwordnotreqd=$passwordnotreqd,
+                    n.unconstraineddelegation=$unconstraineddelegation,
+                    n.sensitive=$sensitive, n.enabled=$enabled,
+                    n.pwdneverexpires=$pwdneverexpires, n.lastlogon=$lastlogon,
+                    n.lastlogontimestamp=$lastlogontimestamp, n.pwdlastset=$pwdlastset,
+                    n.serviceprincipalnames=$serviceprincipalnames, n.hasspn=$hasspn,
+                    n.displayname=$displayname, n.email=$email, n.title=$title,
+                    n.homedirectory=$homedirectory, n.userpassword=$userpassword,
+                    n.sidhistory=$sidhistory
+                    """,
+                    name=default_account["Properties"]["name"],
+                    sid=default_account["ObjectIdentifier"],
+                    highvalue=default_account["Properties"]["highvalue"],
+                    domain=default_account["Properties"]["domain"],
+                    distinguishedname=default_account["Properties"]["distinguishedname"],
+                    description=default_account["Properties"]["description"],
+                    admincount=default_account["Properties"]["admincount"],
+                    dontreqpreauth=default_account["Properties"]["dontreqpreauth"],
+                    passwordnotreqd=default_account["Properties"]["passwordnotreqd"],
+                    unconstraineddelegation=default_account["Properties"]["unconstraineddelegation"],
+                    sensitive=default_account["Properties"]["sensitive"],
+                    enabled=default_account["Properties"]["enabled"],
+                    pwdneverexpires=default_account["Properties"]["pwdneverexpires"],
+                    lastlogon=default_account["Properties"]["lastlogon"],
+                    lastlogontimestamp=default_account["Properties"]["lastlogontimestamp"],
+                    pwdlastset=default_account["Properties"]["pwdlastset"],
+                    serviceprincipalnames=default_account["Properties"]["serviceprincipalnames"],
+                    hasspn=default_account["Properties"]["hasspn"],
+                    displayname=default_account["Properties"]["displayname"],
+                    email=default_account["Properties"]["email"],
+                    title=default_account["Properties"]["title"],
+                    homedirectory=default_account["Properties"]["homedirectory"],
+                    userpassword=default_account["Properties"]["userpassword"],
+                    sidhistory=default_account["Properties"]["sidhistory"]
+                )
+        
+        administrator_user = get_administrator_user(self.domain, self.base_sid)
+        session.run(
+                    """
+                    MERGE (n:Base {name: $name}) SET n:User, n.objectid=$sid,
+                    n.highvalue=$highvalue, n.domain=$domain,
+                    n.distinguishedname=$distinguishedname,
+                    n.description=$description, n.admincount=$admincount,
+                    n.dontreqpreauth=$dontreqpreauth, n.passwordnotreqd=$passwordnotreqd,
+                    n.unconstraineddelegation=$unconstraineddelegation,
+                    n.sensitive=$sensitive, n.enabled=$enabled,
+                    n.pwdneverexpires=$pwdneverexpires, n.lastlogon=$lastlogon,
+                    n.lastlogontimestamp=$lastlogontimestamp, n.pwdlastset=$pwdlastset,
+                    n.serviceprincipalnames=$serviceprincipalnames, n.hasspn=$hasspn,
+                    n.displayname=$displayname, n.email=$email, n.title=$title,
+                    n.homedirectory=$homedirectory, n.userpassword=$userpassword,
+                    n.sidhistory=$sidhistory
+                    """,
+                    name=administrator_user["Properties"]["name"],
+                    sid=administrator_user["ObjectIdentifier"],
+                    highvalue=administrator_user["Properties"]["highvalue"],
+                    domain=administrator_user["Properties"]["domain"],
+                    distinguishedname=administrator_user["Properties"]["distinguishedname"],
+                    description=administrator_user["Properties"]["description"],
+                    admincount=administrator_user["Properties"]["admincount"],
+                    dontreqpreauth=administrator_user["Properties"]["dontreqpreauth"],
+                    passwordnotreqd=administrator_user["Properties"]["passwordnotreqd"],
+                    unconstraineddelegation=administrator_user["Properties"]["unconstraineddelegation"],
+                    sensitive=administrator_user["Properties"]["sensitive"],
+                    enabled=administrator_user["Properties"]["enabled"],
+                    pwdneverexpires=administrator_user["Properties"]["pwdneverexpires"],
+                    lastlogon=administrator_user["Properties"]["lastlogon"],
+                    lastlogontimestamp=administrator_user["Properties"]["lastlogontimestamp"],
+                    pwdlastset=administrator_user["Properties"]["pwdlastset"],
+                    serviceprincipalnames=administrator_user["Properties"]["serviceprincipalnames"],
+                    hasspn=administrator_user["Properties"]["hasspn"],
+                    displayname=administrator_user["Properties"]["displayname"],
+                    email=administrator_user["Properties"]["email"],
+                    title=administrator_user["Properties"]["title"],
+                    homedirectory=administrator_user["Properties"]["homedirectory"],
+                    userpassword=administrator_user["Properties"]["userpassword"],
+                    sidhistory=administrator_user["Properties"]["sidhistory"]
+                )
+        
 
+        print("Generating User Nodes")
         current_time = int(time.time())
         group_name = "DOMAIN USERS@{}".format(self.domain)
         props = []
@@ -581,6 +668,7 @@ class MainMenu(cmd.Cmd):
         print("Adding members to standard groups")
         standard_group_members_list = get_forest_standard_group_members_list(self.domain, self.base_sid)
         for group_member in standard_group_members_list:
+            print(group_member)
             query = "MATCH (memberItem:" + group_member["MemberType"] + " {objectid: '" + group_member["MemberId"] + "'}), (groupItem:Group {objectid: '" + group_member["GroupId"] + "'})"
             query = query + "\nMERGE (memberItem)-[:MemberOf]->(groupItem)"
             session.run(query)
