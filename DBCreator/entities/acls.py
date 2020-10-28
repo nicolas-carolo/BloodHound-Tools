@@ -1,8 +1,8 @@
 from templates.groups import STANDARD_GROUPS
-# from entities.groups import set_group_attributes
+from entities.users import get_standard_users_list
 
 
-def get_forest_group_aces_list(domain_name, domain_sid):
+def get_standard_group_aces_list(domain_name, domain_sid):
     groups_aces_list = []
     groups_list = STANDARD_GROUPS
     for group in groups_list:
@@ -21,6 +21,27 @@ def get_forest_group_aces_list(domain_name, domain_sid):
                 }
                 groups_aces_list.append(item)
     return groups_aces_list
+
+
+def get_standard_user_aces_list(domain_name, domain_sid):
+    users_list = get_standard_users_list()
+    users_aces_list = []
+    for user in users_list:
+        filtered_aces_list = get_filtered_aces_list(user["Aces"])
+        for ace in filtered_aces_list:
+            object_id = get_object_id(user["ObjectIdentifier"], domain_name, domain_sid)
+            identity_reference_id = get_object_id(ace["PrincipalSID"], domain_name, domain_sid)
+            if str(object_id).upper() != str(identity_reference_id).upper():
+                item = {
+                    "ObjectId": object_id,
+                    "ObjectType": "User",
+                    "IdentityReferenceId": identity_reference_id,
+                    "IdentityReferenceType": ace["PrincipalType"],
+                    "Right": ace["RightName"],
+                    "IsInherited": ace["IsInherited"]
+                }
+                users_aces_list.append(item)
+    return users_aces_list
 
 
 def get_filtered_aces_list(aces_list):

@@ -310,3 +310,133 @@ ADMINISTRATOR = {
         }
       ]
     }
+
+
+KRBTGT = {
+      "Properties": {
+        "highvalue": False,
+        "name": "KRBTGT@DOMAIN_NAME.DOMAIN_SUFFIX",
+        "domain": "DOMAIN_NAME.DOMAIN_SUFFIX",
+        "objectid": "DOMAIN_SID-502",
+        "distinguishedname": "CN=krbtgt,CN=Users,DC=DOMAIN_NAME,DC=DOMAIN_SUFFIX",
+        "description": "Key Distribution Center Service Account",
+        "dontreqpreauth": False,
+        "passwordnotreqd": False,
+        "unconstraineddelegation": False,
+        "sensitive": False,
+        "enabled": False,
+        "pwdneverexpires": False,
+        "lastlogon": -1,
+        "lastlogontimestamp": -1,
+        "pwdlastset": 1584136849,
+        "serviceprincipalnames": [
+          "kadmin/changepw"
+        ],
+        "hasspn": True,
+        "displayname": "null",
+        "email": "null",
+        "title": "null",
+        "homedirectory": "null",
+        "userpassword": "null",
+        "admincount": True,
+        "sidhistory": []
+      },
+      "AllowedToDelegate": [],
+      "SPNTargets": [],
+      "PrimaryGroupSid": "DOMAIN_SID-513",
+      "HasSIDHistory": [],
+      "ObjectIdentifier": "DOMAIN_SID-502",
+      "Aces": [
+        {
+          "PrincipalSID": "DOMAIN_SID-512",
+          "PrincipalType": "Group",
+          "RightName": "Owner",
+          "AceType": "",
+          "IsInherited": False
+        },
+        {
+          "PrincipalSID": "DOMAIN_NAME.DOMAIN_SUFFIX-S-1-5-32-544",
+          "PrincipalType": "Group",
+          "RightName": "WriteDacl",
+          "AceType": "",
+          "IsInherited": False
+        },
+        {
+          "PrincipalSID": "DOMAIN_NAME.DOMAIN_SUFFIX-S-1-5-32-544",
+          "PrincipalType": "Group",
+          "RightName": "WriteOwner",
+          "AceType": "",
+          "IsInherited": False
+        },
+        {
+          "PrincipalSID": "DOMAIN_NAME.DOMAIN_SUFFIX-S-1-5-32-544",
+          "PrincipalType": "Group",
+          "RightName": "ExtendedRight",
+          "AceType": "All",
+          "IsInherited": False
+        },
+        {
+          "PrincipalSID": "DOMAIN_NAME.DOMAIN_SUFFIX-S-1-5-32-544",
+          "PrincipalType": "Group",
+          "RightName": "GenericWrite",
+          "AceType": "",
+          "IsInherited": False
+        },
+        {
+          "PrincipalSID": "DOMAIN_SID-512",
+          "PrincipalType": "Group",
+          "RightName": "WriteDacl",
+          "AceType": "",
+          "IsInherited": False
+        },
+        {
+          "PrincipalSID": "DOMAIN_SID-512",
+          "PrincipalType": "Group",
+          "RightName": "WriteOwner",
+          "AceType": "",
+          "IsInherited": False
+        },
+        {
+          "PrincipalSID": "DOMAIN_SID-512",
+          "PrincipalType": "Group",
+          "RightName": "ExtendedRight",
+          "AceType": "All",
+          "IsInherited": False
+        },
+        {
+          "PrincipalSID": "DOMAIN_SID-512",
+          "PrincipalType": "Group",
+          "RightName": "GenericWrite",
+          "AceType": "",
+          "IsInherited": False
+        },
+        {
+          "PrincipalSID": "DOMAIN_SID-519",
+          "PrincipalType": "Group",
+          "RightName": "WriteDacl",
+          "AceType": "",
+          "IsInherited": False
+        },
+        {
+          "PrincipalSID": "DOMAIN_SID-519",
+          "PrincipalType": "Group",
+          "RightName": "WriteOwner",
+          "AceType": "",
+          "IsInherited": False
+        },
+        {
+          "PrincipalSID": "DOMAIN_SID-519",
+          "PrincipalType": "Group",
+          "RightName": "ExtendedRight",
+          "AceType": "All",
+          "IsInherited": False
+        },
+        {
+          "PrincipalSID": "DOMAIN_SID-519",
+          "PrincipalType": "Group",
+          "RightName": "GenericWrite",
+          "AceType": "",
+          "IsInherited": False
+        }
+      ]
+    }

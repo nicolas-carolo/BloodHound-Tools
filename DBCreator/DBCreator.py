@@ -22,8 +22,8 @@ import uuid
 import time
 
 from entities.groups import get_forest_standard_groups_list, get_forest_standard_group_members_list
-from entities.users import get_guest_user, get_default_account, get_administrator_user
-from entities.acls import get_forest_group_aces_list
+from entities.users import get_guest_user, get_default_account, get_administrator_user, get_krbtgt_user
+from entities.acls import get_standard_group_aces_list, get_standard_user_aces_list
 
 
 
@@ -598,6 +598,49 @@ class MainMenu(cmd.Cmd):
                     sidhistory=administrator_user["Properties"]["sidhistory"]
                 )
         
+        krbtgt_user = get_krbtgt_user(self.domain, self.base_sid)
+        session.run(
+                    """
+                    MERGE (n:Base {name: $name}) SET n:User, n.objectid=$sid,
+                    n.highvalue=$highvalue, n.domain=$domain,
+                    n.distinguishedname=$distinguishedname,
+                    n.description=$description, n.admincount=$admincount,
+                    n.dontreqpreauth=$dontreqpreauth, n.passwordnotreqd=$passwordnotreqd,
+                    n.unconstraineddelegation=$unconstraineddelegation,
+                    n.sensitive=$sensitive, n.enabled=$enabled,
+                    n.pwdneverexpires=$pwdneverexpires, n.lastlogon=$lastlogon,
+                    n.lastlogontimestamp=$lastlogontimestamp, n.pwdlastset=$pwdlastset,
+                    n.serviceprincipalnames=$serviceprincipalnames, n.hasspn=$hasspn,
+                    n.displayname=$displayname, n.email=$email, n.title=$title,
+                    n.homedirectory=$homedirectory, n.userpassword=$userpassword,
+                    n.sidhistory=$sidhistory
+                    """,
+                    name=krbtgt_user["Properties"]["name"],
+                    sid=krbtgt_user["ObjectIdentifier"],
+                    highvalue=krbtgt_user["Properties"]["highvalue"],
+                    domain=krbtgt_user["Properties"]["domain"],
+                    distinguishedname=krbtgt_user["Properties"]["distinguishedname"],
+                    description=krbtgt_user["Properties"]["description"],
+                    admincount=krbtgt_user["Properties"]["admincount"],
+                    dontreqpreauth=krbtgt_user["Properties"]["dontreqpreauth"],
+                    passwordnotreqd=krbtgt_user["Properties"]["passwordnotreqd"],
+                    unconstraineddelegation=krbtgt_user["Properties"]["unconstraineddelegation"],
+                    sensitive=krbtgt_user["Properties"]["sensitive"],
+                    enabled=krbtgt_user["Properties"]["enabled"],
+                    pwdneverexpires=krbtgt_user["Properties"]["pwdneverexpires"],
+                    lastlogon=krbtgt_user["Properties"]["lastlogon"],
+                    lastlogontimestamp=krbtgt_user["Properties"]["lastlogontimestamp"],
+                    pwdlastset=krbtgt_user["Properties"]["pwdlastset"],
+                    serviceprincipalnames=krbtgt_user["Properties"]["serviceprincipalnames"],
+                    hasspn=krbtgt_user["Properties"]["hasspn"],
+                    displayname=krbtgt_user["Properties"]["displayname"],
+                    email=krbtgt_user["Properties"]["email"],
+                    title=krbtgt_user["Properties"]["title"],
+                    homedirectory=krbtgt_user["Properties"]["homedirectory"],
+                    userpassword=krbtgt_user["Properties"]["userpassword"],
+                    sidhistory=krbtgt_user["Properties"]["sidhistory"]
+                )
+        
 
         print("Generating User Nodes")
         current_time = int(time.time())
@@ -672,6 +715,8 @@ class MainMenu(cmd.Cmd):
             query = "MATCH (memberItem:" + group_member["MemberType"] + " {objectid: '" + group_member["MemberId"] + "'}), (groupItem:Group {objectid: '" + group_member["GroupId"] + "'})"
             query = query + "\nMERGE (memberItem)-[:MemberOf]->(groupItem)"
             session.run(query)
+        
+
 
         print("Applying random group nesting")
         max_nest = int(round(math.log10(self.num_nodes)))
@@ -791,11 +836,19 @@ class MainMenu(cmd.Cmd):
             'UNWIND $props AS prop MERGE (n:Group {name:prop.a}) WITH n,prop MERGE (m:Computer {name:prop.b}) WITH n,m MERGE (n)-[:AdminTo]->(m)', props=props)
 
         print("Adding ACLs for standard nodes")
-        group_aces_list = get_forest_group_aces_list(self.domain, self.base_sid)
-        for ace in group_aces_list:
+        standard_group_aces_list = get_standard_group_aces_list(self.domain, self.base_sid)
+        for ace in standard_group_aces_list:
             query = "MATCH (identityReferenceItem:" + ace["IdentityReferenceType"] + " {objectid: '" + ace["IdentityReferenceId"] + "'}), (objectItem:" + ace["ObjectType"] + " {objectid: '" + ace["ObjectId"] + "'})"
             query = query + "\nMERGE (identityReferenceItem)-[:" + ace["Right"] + " {isinherited: " + str(ace["IsInherited"]) + "}]->(objectItem)"
             session.run(query)
+        
+        standard_user_aces_list = get_standard_user_aces_list(self.domain, self.base_sid)
+        for ace in standard_user_aces_list:
+            query = "MATCH (identityReferenceItem:" + ace["IdentityReferenceType"] + " {objectid: '" + ace["IdentityReferenceId"] + "'}), (objectItem:" + ace["ObjectType"] + " {objectid: '" + ace["ObjectId"] + "'})"
+            query = query + "\nMERGE (identityReferenceItem)-[:" + ace["Right"] + " {isinherited: " + str(ace["IsInherited"]) + "}]->(objectItem)"
+            session.run(query)
+        
+        
 
         print("Adding RDP/ExecuteDCOM/AllowedToDelegateTo")
         count = int(math.floor(len(computers) * .1))

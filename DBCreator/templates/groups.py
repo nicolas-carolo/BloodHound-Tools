@@ -2755,6 +2755,10 @@ STANDARD_GROUPS = [
         {
           "MemberId": "DOMAIN_SID-500",
           "MemberType": "User"
+        },
+        {
+          "MemberId": "DOMAIN_SID-502",
+          "MemberType": "User"
         }
       ],
       "ObjectIdentifier": "DOMAIN_SID-513",
