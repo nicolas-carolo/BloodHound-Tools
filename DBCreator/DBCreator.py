@@ -24,7 +24,8 @@ import time
 from entities.groups import get_forest_standard_groups_list, get_forest_standard_group_members_list
 from entities.users import get_guest_user, get_default_account, get_administrator_user, get_krbtgt_user
 from entities.acls import get_standard_group_aces_list, get_standard_user_aces_list, get_standard_all_extended_rights,\
-    get_standard_generic_write, get_standard_generic_write_on_gpos, get_standard_owns, get_standard_dacl
+    get_standard_generic_write, get_standard_generic_write_on_gpos, get_standard_owns, get_standard_write_dacl,\
+    get_standard_write_owner
 
 
 
@@ -1107,8 +1108,14 @@ class MainMenu(cmd.Cmd):
         
 
         print("Adding WriteDacl")
-        write_dacl_aces_list = get_standard_dacl(dcou, computer_properties_list, user_properties_list, ou_properties_list, gpos_properties_list, das, self.domain, self.base_sid)
+        write_dacl_aces_list = get_standard_write_dacl(dcou, computer_properties_list, user_properties_list, ou_properties_list, gpos_properties_list, das, self.domain, self.base_sid)
         for ace in write_dacl_aces_list:
+            self.add_right_relationship(session, ace)
+        
+
+        print("Adding WriteOwner")
+        write_owner_aces_list = get_standard_write_owner(dcou, computer_properties_list, user_properties_list, ou_properties_list, gpos_properties_list, das, self.domain, self.base_sid)
+        for ace in write_owner_aces_list:
             self.add_right_relationship(session, ace)
 
 
