@@ -189,6 +189,77 @@ def get_standard_owns(computers_list, users_list, ous_list, gpos_list, domain_na
     return aces_list
 
 
+def get_standard_dacl(dc_ou_sid, computers_list, users_list, ous_list, gpos_list, domain_admins_list, domain_name, domain_sid):
+    aces_list = []
+    administrators_sid = str(domain_name).upper() + "-" + "S-1-5-32-544"
+    enterprise_admins_sid = domain_sid + "-519"
+    domain_admins_sid = domain_sid + "-512"
+    for computer in computers_list:
+        ace = {
+            "ObjectId": computer["id"],
+            "ObjectType": "Computer",
+            "IdentityReferenceId": administrators_sid,
+            "IdentityReferenceType": "Group",
+            "Right": "WriteDacl",
+            "IsInherited": True
+        }
+        aces_list.append(ace)
+    for user in users_list:
+        if user["props"]["name"] in domain_admins_list or str(cn(user["props"]["name"], domain_name)).upper() == "KRBTGT":
+            is_inherited = False
+        else:
+            is_inherited = True
+        ace = {
+            "ObjectId": user["id"],
+            "ObjectType": "User",
+            "IdentityReferenceId": administrators_sid,
+            "IdentityReferenceType": "Group",
+            "Right": "WriteDacl",
+            "IsInherited": is_inherited
+        }
+        aces_list.append(ace)
+    for ou in ous_list:
+        ace = {
+            "ObjectId": ou["ouguid"],
+            "ObjectType": "OU",
+            "IdentityReferenceId": administrators_sid,
+            "IdentityReferenceType": "Group",
+            "Right": "WriteDacl",
+            "IsInherited": True
+        }
+        aces_list.append(ace)
+    for group_sid in [domain_admins_sid, administrators_sid]:
+        ace = {
+            "ObjectId": dc_ou_sid,
+            "ObjectType": "OU",
+            "IdentityReferenceId": group_sid,
+            "IdentityReferenceType": "Group",
+            "Right": "WriteDacl",
+            "IsInherited": get_dc_ou_isinherited_value(group_sid, domain_name)
+        }
+        aces_list.append(ace)
+    aces_list.append(ace)
+    for group_sid in [domain_admins_sid, enterprise_admins_sid]:
+        for gpo in gpos_list:
+            ace = {
+                "ObjectId": gpo["id"],
+                "ObjectType": "GPO",
+                "IdentityReferenceId": group_sid,
+                "IdentityReferenceType": "Group",
+                "Right": "WriteDacl",
+                "IsInherited": False
+            }
+            aces_list.append(ace)
+    return aces_list
+
+
+def get_dc_ou_isinherited_value(group_sid, domain_name):
+    if group_sid == str(domain_name).upper() + "-" + "S-1-5-32-544":
+        return True
+    else:
+        return False
+
+
 def get_filtered_aces_list(aces_list):
     filtered_aces_list = []
     for ace in aces_list:
