@@ -49,9 +49,6 @@ def get_standard_all_extended_rights(users_list, domain_admins_list, domain_name
     administrators_sid = str(domain_name).upper() + "-" + "S-1-5-32-544"
     enterprise_admins_sid = domain_sid + "-519"
     domain_admins_sid = domain_sid + "-512"
-    print("da:", domain_admins_sid)
-    print("ea:", enterprise_admins_sid)
-    print(domain_admins_list)
     for group_sid in [administrators_sid, domain_admins_sid]:
         ace = {
             "ObjectId": domain_sid,
@@ -64,7 +61,6 @@ def get_standard_all_extended_rights(users_list, domain_admins_list, domain_name
         aces_list.append(ace)
     for user in users_list:
         if user["props"]["name"] in domain_admins_list:
-            print(user["props"]["name"])
             is_inherited = False
             ace = {
                 "ObjectId": user["id"],
@@ -95,6 +91,55 @@ def get_standard_all_extended_rights(users_list, domain_admins_list, domain_name
             "IsInherited": is_inherited
         }
         aces_list.append(ace)
+    return aces_list
+
+
+def get_standard_generic_write(computers_list, users_list, domain_admins_list, domain_name, domain_sid):
+    aces_list = []
+    administrators_sid = str(domain_name).upper() + "-" + "S-1-5-32-544"
+    enterprise_admins_sid = domain_sid + "-519"
+    for computer in computers_list:
+        ace = {
+            "ObjectId": computer["id"],
+            "ObjectType": "Computer",
+            "IdentityReferenceId": administrators_sid,
+            "IdentityReferenceType": "Group",
+            "Right": "GenericWrite",
+            "IsInherited": True
+        }
+        aces_list.append(ace)
+    for user in users_list:
+        if user["props"]["name"] in domain_admins_list or str(cn(user["props"]["name"], domain_name)).upper() == "KRBTGT":
+            is_inherited = False
+        else:
+            is_inherited = True
+        ace = {
+            "ObjectId": user["id"],
+            "ObjectType": "User",
+            "IdentityReferenceId": administrators_sid,
+            "IdentityReferenceType": "Group",
+            "Right": "GenericWrite",
+            "IsInherited": is_inherited
+        }
+        aces_list.append(ace)
+    return aces_list
+
+
+def get_standard_generic_write_on_gpos(gpos_list, domain_name, domain_sid):
+    aces_list = []
+    enterprise_admins_sid = domain_sid + "-519"
+    domain_admins_sid = domain_sid + "-512"
+    for group_sid in [enterprise_admins_sid, domain_admins_sid]:
+        for gpo in gpos_list:
+            ace = {
+                "ObjectId": gpo["id"],
+                "ObjectType": "GPO",
+                "IdentityReferenceId": group_sid,
+                "IdentityReferenceType": "Group",
+                "Right": "GenericWrite",
+                "IsInherited": False
+            }
+            aces_list.append(ace)
     return aces_list
 
 
@@ -147,3 +192,7 @@ def get_object_id(object_id, domain_name, domain_sid):
     object_id = str(object_id).replace("DOMAIN_SID", domain_sid)
     object_id = str(object_id).replace("DOMAIN_NAME.DOMAIN_SUFFIX", str(domain_name).upper())
     return object_id
+
+
+def cn(name, domain_name):
+    return f"{name}@{domain_name}"

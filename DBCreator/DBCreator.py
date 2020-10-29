@@ -23,7 +23,8 @@ import time
 
 from entities.groups import get_forest_standard_groups_list, get_forest_standard_group_members_list
 from entities.users import get_guest_user, get_default_account, get_administrator_user, get_krbtgt_user
-from entities.acls import get_standard_group_aces_list, get_standard_user_aces_list, get_standard_all_extended_rights
+from entities.acls import get_standard_group_aces_list, get_standard_user_aces_list, get_standard_all_extended_rights,\
+    get_standard_generic_write, get_standard_generic_write_on_gpos
 
 
 
@@ -254,10 +255,12 @@ class MainMenu(cmd.Cmd):
             return
 
         computers = []
+        computer_properties_list = []
         groups = []
         users = []
         user_properties_list = []
         gpos = []
+        gpos_properties_list = []
         ou_guid_map = {}
 
         used_states = []
@@ -442,11 +445,16 @@ class MainMenu(cmd.Cmd):
             computers.append(comp_name)
             os = random.choice(os_list)
             enabled = True
-            props.append({'id': cs(ridcount), 'props': {
-                'name': comp_name,
-                'operatingsystem': os,
-                'enabled': enabled,
-            }})
+            computer_property = {
+                'id': cs(ridcount),
+                'props': {
+                    'name': comp_name,
+                    'operatingsystem': os,
+                    'enabled': enabled,
+                }
+            }
+            props.append(computer_property)
+            computer_properties_list.append(computer_property)
             ridcount += 1
 
             if (len(props) > 500):
@@ -863,6 +871,12 @@ class MainMenu(cmd.Cmd):
         for ace in all_extended_rights_aces_list:
             self.add_right_relationship(session, ace)
         
+
+        print("Adding GenericWrite")
+        generic_write_aces_list = get_standard_generic_write(computer_properties_list, user_properties_list, das, self.domain, self.base_sid)
+        for ace in generic_write_aces_list:
+            self.add_right_relationship(session, ace)
+        
         
 
         print("Adding RDP/ExecuteDCOM/AllowedToDelegateTo")
@@ -1038,9 +1052,14 @@ class MainMenu(cmd.Cmd):
         for i in range(1, 20):
             gpo_name = "GPO_{}@{}".format(i, self.domain)
             guid = str(uuid.uuid4())
+            gpo_properties = {
+                'id': guid,
+                'name': gpo_name
+            }
             session.run(
                 "MERGE (n:Base {name:$gponame}) SET n:GPO, n.objectid=$guid", gponame=gpo_name, guid=guid)
             gpos.append(gpo_name)
+            gpos_properties_list.append(gpo_properties)
 
         ou_names = list(ou_guid_map.keys())
         for g in gpos:
@@ -1066,8 +1085,15 @@ class MainMenu(cmd.Cmd):
             15 + ["ReadLAPSPassword"] * 10
 
         num_acl_principals = int(round(len(it_groups) * .1))
-        print("Adding outbound ACLs to {} objects".format(num_acl_principals))
 
+
+        print("Adding GenericWrite on GPOs")
+        generic_write_aces_list = get_standard_generic_write_on_gpos(gpos_properties_list, self.domain, self.base_sid)
+        for ace in generic_write_aces_list:
+            self.add_right_relationship(session, ace)
+
+
+        print("Adding outbound ACLs to {} objects".format(num_acl_principals))
         acl_groups = random.sample(it_groups, num_acl_principals)
         all_principals = it_users + it_groups
         props = []
