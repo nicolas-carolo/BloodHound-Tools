@@ -24,7 +24,7 @@ import time
 from entities.groups import get_forest_standard_groups_list, get_forest_standard_group_members_list
 from entities.users import get_guest_user, get_default_account, get_administrator_user, get_krbtgt_user
 from entities.acls import get_standard_group_aces_list, get_standard_user_aces_list, get_standard_all_extended_rights,\
-    get_standard_generic_write, get_standard_generic_write_on_gpos
+    get_standard_generic_write, get_standard_generic_write_on_gpos, get_standard_owns
 
 
 
@@ -262,6 +262,7 @@ class MainMenu(cmd.Cmd):
         gpos = []
         gpos_properties_list = []
         ou_guid_map = {}
+        ou_properties_list = []
 
         used_states = []
 
@@ -1009,7 +1010,13 @@ class MainMenu(cmd.Cmd):
             guid = str(uuid.uuid4())
             ou_guid_map[ouname] = guid
             for c in ou_comps:
-                props.append({'compname': c, 'ouguid': guid, 'ouname': ouname})
+                ou_properties = {
+                    'compname': c,
+                    'ouguid': guid,
+                    'ouname': ouname
+                }
+                props.append(ou_properties)
+                ou_properties_list.append(ou_properties)
                 if len(props) > 500:
                     session.run(
                         'UNWIND $props as prop MERGE (n:Computer {name:prop.compname}) WITH n,prop MERGE (m:Base {objectid:prop.ouguid, name:prop.ouname, blocksInheritance: false}) SET m:OU WITH n,m,prop MERGE (m)-[:Contains]->(n)', props=props)
@@ -1090,6 +1097,12 @@ class MainMenu(cmd.Cmd):
         print("Adding GenericWrite on GPOs")
         generic_write_aces_list = get_standard_generic_write_on_gpos(gpos_properties_list, self.domain, self.base_sid)
         for ace in generic_write_aces_list:
+            self.add_right_relationship(session, ace)
+        
+
+        print("Adding Owns")
+        owns_aces_list = get_standard_owns(computer_properties_list, user_properties_list, ou_properties_list, gpos_properties_list, self.domain, self.base_sid)
+        for ace in owns_aces_list:
             self.add_right_relationship(session, ace)
 
 

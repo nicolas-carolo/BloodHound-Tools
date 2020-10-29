@@ -143,6 +143,52 @@ def get_standard_generic_write_on_gpos(gpos_list, domain_name, domain_sid):
     return aces_list
 
 
+def get_standard_owns(computers_list, users_list, ous_list, gpos_list, domain_name, domain_sid):
+    aces_list = []
+    domain_admins_sid = domain_sid + "-512"
+    for computer in computers_list:
+        ace = {
+            "ObjectId": computer["id"],
+            "ObjectType": "Computer",
+            "IdentityReferenceId": domain_admins_sid,
+            "IdentityReferenceType": "Group",
+            "Right": "Owns",
+            "IsInherited": False
+        }
+        aces_list.append(ace)
+    for user in users_list:
+        ace = {
+            "ObjectId": user["id"],
+            "ObjectType": "User",
+            "IdentityReferenceId": domain_admins_sid,
+            "IdentityReferenceType": "Group",
+            "Right": "Owns",
+            "IsInherited": False
+        }
+        aces_list.append(ace)
+    for ou in ous_list:
+        ace = {
+            "ObjectId": ou["ouguid"],
+            "ObjectType": "OU",
+            "IdentityReferenceId": domain_admins_sid,
+            "IdentityReferenceType": "Group",
+            "Right": "Owns",
+            "IsInherited": False
+        }
+        aces_list.append(ace)
+    for gpo in gpos_list:
+        ace = {
+            "ObjectId": gpo["id"],
+            "ObjectType": "GPO",
+            "IdentityReferenceId": domain_admins_sid,
+            "IdentityReferenceType": "Group",
+            "Right": "Owns",
+            "IsInherited": False
+        }
+        aces_list.append(ace)
+    return aces_list
+
+
 def get_filtered_aces_list(aces_list):
     filtered_aces_list = []
     for ace in aces_list:
