@@ -23,7 +23,7 @@ import time
 
 from entities.groups import get_forest_standard_groups_list, get_forest_standard_group_members_list
 from entities.users import get_guest_user, get_default_account, get_administrator_user, get_krbtgt_user
-from entities.acls import get_standard_group_aces_list, get_standard_user_aces_list
+from entities.acls import get_standard_group_aces_list, get_standard_user_aces_list, get_standard_all_extended_rights
 
 
 
@@ -256,6 +256,7 @@ class MainMenu(cmd.Cmd):
         computers = []
         groups = []
         users = []
+        user_properties_list = []
         gpos = []
         ou_guid_map = {}
 
@@ -361,7 +362,10 @@ class MainMenu(cmd.Cmd):
 
 
         session.run(
-            "MERGE (n:Base {name:$domain}) SET n:Domain, n.highvalue=true", domain=self.domain)
+            "MERGE (n:Base {name:$domain}) SET n:Domain, n.highvalue=true, n.objectid=$objectid",
+            domain=self.domain,
+            objectid=self.base_sid
+        )
         ddp = str(uuid.uuid4())
         ddcp = str(uuid.uuid4())
         dcou = str(uuid.uuid4())
@@ -660,13 +664,18 @@ class MainMenu(cmd.Cmd):
             ridcount += 1
             objectsid = cs(ridcount)
 
-            props.append({'id': objectsid, 'props': {
-                'displayname': dispname,
-                'name': user_name,
-                'enabled': enabled,
-                'pwdlastset': pwdlastset,
-                'lastlogon': lastlogon
-            }})
+            user_property = {
+                'id': objectsid,
+                'props': {
+                    'displayname': dispname,
+                    'name': user_name,
+                    'enabled': enabled,
+                    'pwdlastset': pwdlastset,
+                    'lastlogon': lastlogon
+                }
+            }
+            props.append(user_property)
+            user_properties_list.append(user_property)
             if (len(props) > 500):
                 session.run(
                     'UNWIND $props as prop MERGE (n:Base {objectid:prop.id}) SET n:User, n += prop.props WITH n MATCH (m:Group {name:$gname}) WITH n,m MERGE (n)-[:MemberOf]->(m)', props=props, gname=group_name)
@@ -706,8 +715,8 @@ class MainMenu(cmd.Cmd):
             danum, dapctint))
         das = random.sample(users, danum)
         for da in das:
-            session.run(
-                'MERGE (n:User {name:$name}) WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (n)-[:MemberOf]->(m)', name=da, gname=cn("DOMAIN ADMINS"))
+            session.run('MERGE (n:User {name:$name}) WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (n)-[:MemberOf]->(m)', name=da, gname=cn("DOMAIN ADMINS"))
+
 
         print("Adding members to standard groups")
         standard_group_members_list = get_forest_standard_group_members_list(self.domain, self.base_sid)
@@ -847,6 +856,12 @@ class MainMenu(cmd.Cmd):
             query = "MATCH (identityReferenceItem:" + ace["IdentityReferenceType"] + " {objectid: '" + ace["IdentityReferenceId"] + "'}), (objectItem:" + ace["ObjectType"] + " {objectid: '" + ace["ObjectId"] + "'})"
             query = query + "\nMERGE (identityReferenceItem)-[:" + ace["Right"] + " {isinherited: " + str(ace["IsInherited"]) + "}]->(objectItem)"
             session.run(query)
+        
+
+        print("Adding AllExtendedRights")
+        all_extended_rights_aces_list = get_standard_all_extended_rights(user_properties_list, das, self.domain, self.base_sid)
+        for ace in all_extended_rights_aces_list:
+            self.add_right_relationship(session, ace)
         
         
 
@@ -1102,9 +1117,16 @@ class MainMenu(cmd.Cmd):
         print("Database Generation Finished!")
 
 
+    def add_right_relationship(self, session, ad_object):
+        query = "MATCH (identityReferenceItem:" + ad_object["IdentityReferenceType"] + " {objectid: '" + ad_object["IdentityReferenceId"] + "'}), (objectItem:" + ad_object["ObjectType"] + " {objectid: '" + ad_object["ObjectId"] + "'})"
+        query = query + "\nMERGE (identityReferenceItem)-[:" + ad_object["Right"] + " {isinherited: " + str(ad_object["IsInherited"]) + "}]->(objectItem)"
+        session.run(query)
+
+
 if __name__ == '__main__':
     try:
         MainMenu().cmdloop()
     except KeyboardInterrupt:
         print("Exiting")
         sys.exit()
+
