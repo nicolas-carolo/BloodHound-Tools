@@ -25,7 +25,7 @@ from entities.groups import get_forest_standard_groups_list, get_forest_standard
 from entities.users import get_guest_user, get_default_account, get_administrator_user, get_krbtgt_user
 from entities.acls import get_standard_group_aces_list, get_standard_user_aces_list, get_standard_all_extended_rights,\
     get_standard_generic_write, get_standard_generic_write_on_gpos, get_standard_owns, get_standard_write_dacl,\
-    get_standard_write_owner
+    get_standard_write_owner, get_standard_generic_all
 
 
 
@@ -257,6 +257,7 @@ class MainMenu(cmd.Cmd):
 
         computers = []
         computer_properties_list = []
+        dc_properties_list = []
         groups = []
         users = []
         user_properties_list = []
@@ -396,7 +397,7 @@ class MainMenu(cmd.Cmd):
         # Ent Admins -> Domain Node
         group_name = "ENTERPRISE ADMINS@{}".format(self.domain)
         session.run(
-            'MERGE (n:Domain {name:$domain}) MERGE (m:Group {name:$gname}) MERGE (m)-[:GenericAll {isacl:true}]->(n)', domain=self.domain, gname=group_name)
+            'MERGE (n:Domain {name:$domain}) MERGE (m:Group {name:$gname}) MERGE (m)-[:GenericAll {isacl:true, isinherited: false}]->(n)', domain=self.domain, gname=group_name)
 
         # Administrators -> Domain Node
         group_name = "ADMINISTRATORS@{}".format(self.domain)
@@ -471,6 +472,11 @@ class MainMenu(cmd.Cmd):
             comp_name = cn(f"{state}LABDC")
             group_name = cn("DOMAIN CONTROLLERS")
             sid = cs(ridcount)
+            dc_properties = {
+                'name': comp_name,
+                'id': sid
+            }
+            dc_properties_list.append(dc_properties)
             session.run(
                 'MERGE (n:Base {objectid:$sid}) SET n:Computer,n.name=$name WITH n MATCH (m:Group {name:$gname}) WITH n,m MERGE (n)-[:MemberOf]->(m)', sid=sid, name=comp_name, gname=group_name)
             session.run(
@@ -965,6 +971,7 @@ class MainMenu(cmd.Cmd):
         print("Adding Domain Admin ACEs")
         group_name = "DOMAIN ADMINS@{}".format(self.domain)
         props = []
+        """
         for x in computers:
             props.append({'name': x})
 
@@ -986,7 +993,7 @@ class MainMenu(cmd.Cmd):
 
         session.run(
             'UNWIND $props as prop MATCH (n:User {name:prop.name}) WITH n MATCH (m:Group {name:$gname}) WITH m,n MERGE (m)-[r:GenericAll {isacl:true}]->(n)', props=props, gname=group_name)
-
+        """
         for x in groups:
             props.append({'name': x})
 
@@ -1116,6 +1123,12 @@ class MainMenu(cmd.Cmd):
         print("Adding WriteOwner")
         write_owner_aces_list = get_standard_write_owner(dcou, computer_properties_list, user_properties_list, ou_properties_list, gpos_properties_list, das, self.domain, self.base_sid)
         for ace in write_owner_aces_list:
+            self.add_right_relationship(session, ace)
+        
+
+        print("Adding GenericAll")
+        generic_all_aces_list = get_standard_generic_all(dcou, dc_properties_list, computer_properties_list, user_properties_list, ou_properties_list, gpos_properties_list, das, self.domain, self.base_sid)
+        for ace in generic_all_aces_list:
             self.add_right_relationship(session, ace)
 
 

@@ -353,6 +353,97 @@ def get_standard_write_owner(dc_ou_sid, computers_list, users_list, ous_list, gp
     return aces_list
 
 
+def get_standard_generic_all(dc_ou_sid, dcs_list, computers_list, users_list, ous_list, gpos_list, domain_admins_list, domain_name, domain_sid):
+    aces_list = []
+    administrators_sid = str(domain_name).upper() + "-S-1-5-32-544"
+    enterprise_admins_sid = domain_sid + "-519"
+    domain_admins_sid = domain_sid + "-512"
+    account_operators_sid = str(domain_name).upper() + "-S-1-5-32-548"
+    dc_sids_list = []
+    for dc in dcs_list:
+        dc_sids_list.append(dc["id"])
+        computers_list.append(dc)
+    for computer in computers_list:
+        if not computer["id"] in dc_sids_list:
+            ace = {
+                "ObjectId": computer["id"],
+                "ObjectType": "Computer",
+                "IdentityReferenceId": account_operators_sid,
+                "IdentityReferenceType": "Group",
+                "Right": "GenericAll",
+                "IsInherited": False
+            }
+            aces_list.append(ace)
+        ace = {
+            "ObjectId": computer["id"],
+            "ObjectType": "Computer",
+            "IdentityReferenceId": enterprise_admins_sid,
+            "IdentityReferenceType": "Group",
+            "Right": "GenericAll",
+            "IsInherited": True
+        }
+        aces_list.append(ace)
+        ace = {
+            "ObjectId": computer["id"],
+            "ObjectType": "Computer",
+            "IdentityReferenceId": domain_admins_sid,
+            "IdentityReferenceType": "Group",
+            "Right": "GenericAll",
+            "IsInherited": False
+        }
+        aces_list.append(ace)
+    for user in users_list:
+        if not user["props"]["name"] in domain_admins_list and str(cn(user["props"]["name"], domain_name)).upper() != "KRBTGT":
+            for group_sid in [domain_admins_sid, account_operators_sid]:
+                ace = {
+                    "ObjectId": user["id"],
+                    "ObjectType": "User",
+                    "IdentityReferenceId": group_sid,
+                    "IdentityReferenceType": "Group",
+                    "Right": "GenericAll",
+                    "IsInherited": False
+                }
+                aces_list.append(ace)
+            ace = {
+                "ObjectId": user["id"],
+                "ObjectType": "User",
+                "IdentityReferenceId": enterprise_admins_sid,
+                "IdentityReferenceType": "Group",
+                "Right": "GenericAll",
+                "IsInherited": True
+            }
+            aces_list.append(ace)
+    for ou in ous_list:
+        ace = {
+            "ObjectId": ou["ouguid"],
+            "ObjectType": "OU",
+            "IdentityReferenceId": domain_admins_sid,
+            "IdentityReferenceType": "Group",
+            "Right": "GenericAll",
+            "IsInherited": False
+        }
+        aces_list.append(ace)
+        ace = {
+            "ObjectId": ou["ouguid"],
+            "ObjectType": "OU",
+            "IdentityReferenceId": enterprise_admins_sid,
+            "IdentityReferenceType": "Group",
+            "Right": "GenericAll",
+            "IsInherited": True
+        }
+        aces_list.append(ace)
+    ace = {
+        "ObjectId": dc_ou_sid,
+        "ObjectType": "OU",
+        "IdentityReferenceId": enterprise_admins_sid,
+        "IdentityReferenceType": "Group",
+        "Right": "GenericAll",
+        "IsInherited": True
+    }
+    aces_list.append(ace)
+    return aces_list
+
+
 def get_dc_ou_isinherited_value(group_sid, domain_name):
     if group_sid == str(domain_name).upper() + "-" + "S-1-5-32-544":
         return True
