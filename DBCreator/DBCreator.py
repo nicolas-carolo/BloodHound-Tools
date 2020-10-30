@@ -27,6 +27,7 @@ from entities.users import get_guest_user, get_default_account, get_administrato
 from entities.acls import get_standard_group_aces_list, get_standard_user_aces_list, get_standard_all_extended_rights,\
     get_standard_generic_write, get_standard_owns, get_standard_write_dacl, get_standard_write_owner,\
     get_standard_generic_all
+from utils.principals import get_cn, get_sid_from_rid
 
 
 
@@ -276,36 +277,8 @@ class MainMenu(cmd.Cmd):
             ["Windows Server 2012"] * 8 + ["Windows Server 2008"] * 12
         session = self.driver.session()
 
-        def cn(name):
-            return f"{name}@{self.domain}"
-
-        def cs(relative_id):
-            return f"{self.base_sid}-{str(relative_id)}"
-
-        def cws(security_id):
-            return f"{self.domain}-{str(security_id)}"
 
         print("Starting data generation with nodes={}".format(self.num_nodes))
-
-        """
-        print("Populating Standard Nodes")
-        base_statement = "MERGE (n:Base {name: $gname}) SET n:Group, n.objectid=$sid"
-        session.run(f"{base_statement},n.highvalue=true",
-                    sid=cs(512), gname=cn("DOMAIN ADMINS"))
-        session.run(base_statement, sid=cs(515), gname=cn("DOMAIN COMPUTERS"))
-        session.run(base_statement, gname=cn("DOMAIN USERS"), sid=cs(513))
-        session.run(f"{base_statement},n.highvalue=true",
-                    gname=cn("DOMAIN CONTROLLERS"), sid=cs(516))
-        session.run(f"{base_statement},n.highvalue=true", gname=cn(
-            "ENTERPRISE DOMAIN CONTROLLERS"), sid=cws("S-1-5-9"))
-        session.run(base_statement, gname=cn(
-            "ENTERPRISE READ-ONLY DOMAIN CONTROLLERS"), sid=cs(498))
-        session.run(f"{base_statement},n.highvalue=true",
-                    gname=cn("ADMINISTRATORS"), sid=cs(544))
-        session.run(f"{base_statement},n.highvalue=true",
-                    gname=cn("ENTERPRISE ADMINS"), sid=cs(519))
-        """
-
         
         standard_groups_list = get_forest_standard_groups_list(self.domain, self.base_sid)
         for standard_group in standard_groups_list:
@@ -377,11 +350,9 @@ class MainMenu(cmd.Cmd):
         ddcp = str(uuid.uuid4())
         dcou = str(uuid.uuid4())
         base_statement = "MERGE (n:Base {name:$gpo, objectid:$guid}) SET n:GPO"
-        session.run(base_statement, gpo=cn("DEFAULT DOMAIN POLICY"), guid=ddp)
-        session.run(base_statement, gpo=cn(
-            "DEFAULT DOMAIN CONTROLLERS POLICY"), guid=ddp)
-        session.run("MERGE (n:Base {name:$ou, objectid:$guid, blocksInheritance: false}) SET n:OU", ou=cn(
-            "DOMAIN CONTROLLERS"), guid=dcou)
+        session.run(base_statement, gpo=get_cn("DEFAULT DOMAIN POLICY", self.domain), guid=ddp)
+        session.run(base_statement, gpo=get_cn("DEFAULT DOMAIN CONTROLLERS POLICY", self.domain), guid=ddp)
+        session.run("MERGE (n:Base {name:$ou, objectid:$guid, blocksInheritance: false}) SET n:OU", ou=get_cn("DOMAIN CONTROLLERS", self.domain), guid=dcou)
 
         print("Adding Standard Edges")
 
@@ -450,7 +421,7 @@ class MainMenu(cmd.Cmd):
             os = random.choice(os_list)
             enabled = True
             computer_property = {
-                'id': cs(ridcount),
+                'id': get_sid_from_rid(ridcount, self.base_sid),
                 'props': {
                     'name': comp_name,
                     'operatingsystem': os,
@@ -470,9 +441,9 @@ class MainMenu(cmd.Cmd):
 
         print("Creating Domain Controllers")
         for state in states:
-            comp_name = cn(f"{state}LABDC")
-            group_name = cn("DOMAIN CONTROLLERS")
-            sid = cs(ridcount)
+            comp_name = get_cn(f"{state}LABDC", self.domain)
+            group_name = get_cn("DOMAIN CONTROLLERS", self.domain)
+            sid = get_sid_from_rid(ridcount, self.base_sid)
             dc_properties = {
                 'name': comp_name,
                 'id': sid
@@ -483,9 +454,9 @@ class MainMenu(cmd.Cmd):
             session.run(
                 'MATCH (n:Computer {objectid:$sid}) WITH n MATCH (m:OU {objectid:$dcou}) WITH n,m MERGE (m)-[:Contains]->(n)', sid=sid, dcou=dcou)
             session.run(
-                'MATCH (n:Computer {objectid:$sid}) WITH n MATCH (m:Group {name:$gname}) WITH n,m MERGE (n)-[:MemberOf]->(m)', sid=sid, gname=cn("ENTERPRISE DOMAIN CONTROLLERS"))
+                'MATCH (n:Computer {objectid:$sid}) WITH n MATCH (m:Group {name:$gname}) WITH n,m MERGE (n)-[:MemberOf]->(m)', sid=sid, gname=get_cn("ENTERPRISE DOMAIN CONTROLLERS", self.domain))
             session.run(
-                'MERGE (n:Computer {objectid:$sid}) WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (m)-[:AdminTo]->(n)', sid=sid, gname=cn("DOMAIN ADMINS"))
+                'MERGE (n:Computer {objectid:$sid}) WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (m)-[:AdminTo]->(n)', sid=sid, gname=get_cn("DOMAIN ADMINS", self.domain))
 
         used_states = list(set(used_states))
 
@@ -685,7 +656,7 @@ class MainMenu(cmd.Cmd):
             pwdlastset = self.generate_timestamp()
             lastlogon = self.generate_timestamp()
             ridcount += 1
-            objectsid = cs(ridcount)
+            objectsid = get_sid_from_rid(ridcount, self.base_sid)
 
             user_property = {
                 'id': objectsid,
@@ -715,7 +686,7 @@ class MainMenu(cmd.Cmd):
             dept = random.choice(weighted_parts)
             group_name = "{}{:05d}@{}".format(dept, i, self.domain)
             groups.append(group_name)
-            sid = cs(ridcount)
+            sid = get_sid_from_rid(ridcount, self.base_sid)
             ridcount += 1
             props.append({'name': group_name, 'id': sid})
             if len(props) > 500:
@@ -728,7 +699,7 @@ class MainMenu(cmd.Cmd):
 
         print("Adding Domain Admins to Local Admins of Computers")
         session.run(
-            'MATCH (n:Computer) MATCH (m:Group {objectid: $id}) MERGE (m)-[:AdminTo]->(n)', id=cs(512))
+            'MATCH (n:Computer) MATCH (m:Group {objectid: $id}) MERGE (m)-[:AdminTo]->(n)', id=get_sid_from_rid(512, self.base_sid))
 
         dapctint = random.randint(3, 5)
         dapct = float(dapctint) / 100
@@ -738,7 +709,7 @@ class MainMenu(cmd.Cmd):
             danum, dapctint))
         das = random.sample(users, danum)
         for da in das:
-            session.run('MERGE (n:User {name:$name}) WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (n)-[:MemberOf]->(m)', name=da, gname=cn("DOMAIN ADMINS"))
+            session.run('MERGE (n:User {name:$name}) WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (n)-[:MemberOf]->(m)', name=da, gname=get_cn("DOMAIN ADMINS", self.domain))
 
 
         print("Adding members to standard groups")
