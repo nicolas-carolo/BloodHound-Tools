@@ -21,13 +21,17 @@ from collections import defaultdict
 import uuid
 import time
 
-from entities.groups import get_forest_standard_groups_list, get_forest_standard_group_members_list
+from entities.groups import get_forest_standard_group_members_list
 from entities.users import get_guest_user, get_default_account, get_administrator_user, get_krbtgt_user,\
     get_forest_user_sid_list
 from entities.acls import get_standard_group_aces_list, get_standard_user_aces_list, get_standard_all_extended_rights,\
     get_standard_generic_write, get_standard_owns, get_standard_write_dacl, get_standard_write_owner,\
     get_standard_generic_all
 from utils.principals import get_cn, get_sid_from_rid
+from generators.groups import generate_default_groups
+from generators.domains import generate_domain
+from generators.gpos import generate_default_gpos
+from generators.ous import generate_domain_controllers_ou
 
 
 
@@ -275,84 +279,30 @@ class MainMenu(cmd.Cmd):
         os_list = ["Windows Server 2003"] * 1 + ["Windows Server 2008"] * 15 + ["Windows 7"] * 35 + \
             ["Windows 10"] * 28 + ["Windows XP"] * 1 + \
             ["Windows Server 2012"] * 8 + ["Windows Server 2008"] * 12
+        
         session = self.driver.session()
 
 
         print("Starting data generation with nodes={}".format(self.num_nodes))
+
+        print("Generating the Domain")
+        generate_domain(session, self.domain, self.base_sid)
         
-        standard_groups_list = get_forest_standard_groups_list(self.domain, self.base_sid)
-        for standard_group in standard_groups_list:
-            try:
-                session.run(
-                    """
-                    MERGE (n:Base {name: $gname}) SET n:Group, n.objectid=$sid,
-                    n.highvalue=$highvalue, n.domain=$domain,
-                    n.distinguishedname=$distinguishedname,
-                    n.description=$description, n.admincount=$admincount,
-                    n.default=true
-                    """,
-                    gname=standard_group["Properties"]["name"],
-                    sid=standard_group["ObjectIdentifier"],
-                    highvalue=standard_group["Properties"]["highvalue"],
-                    domain=standard_group["Properties"]["domain"],
-                    distinguishedname=standard_group["Properties"]["distinguishedname"],
-                    description=standard_group["Properties"]["description"],
-                    admincount=standard_group["Properties"]["admincount"]
-                )
-            except KeyError:
-                # print(standard_group)
-                standard_group_properties = standard_group["Properties"]
-                if not "highvalue" in standard_group_properties:
-                    highvalue = "null"
-                else:
-                    highvalue = standard_group["Properties"]["highvalue"]
-                if not "distinguishedname" in standard_group_properties:
-                    dn = "null"
-                else:
-                    dn = standard_group["Properties"]["distinguishedname"]
-                if not "description" in standard_group_properties:
-                    description = "null"
-                else:
-                    description = standard_group["Properties"]["description"]
-                if not "admincount" in standard_group_properties:
-                    admincount = "null"
-                else:
-                    admincount = standard_group["Properties"]["admincount"]
-                if not "domain" in standard_group_properties:
-                    domain = "null"
-                else:
-                    domain = standard_group["Properties"]["domain"]
-                session.run(
-                    """
-                    MERGE (n:Base {name: $gname}) SET n:Group, n.objectid=$sid,
-                    n.highvalue=$highvalue, n.domain=$domain,
-                    n.distinguishedname=$distinguishedname,
-                    n.description=$description, n.admincount=$admincount,
-                    n.default=true
-                    """,
-                    gname=standard_group["Properties"]["name"],
-                    sid=standard_group["ObjectIdentifier"],
-                    highvalue=highvalue,
-                    domain=domain,
-                    distinguishedname=dn,
-                    description=description,
-                    admincount=admincount
-                )
+        print("Generating the default domain Groups")
+        generate_default_groups(session, self.domain, self.base_sid)
                 
 
+        # TODO upper case for all the GPOs
+        ddp = str(uuid.uuid4()).upper()
+        ddcp = str(uuid.uuid4()).upper()
+        dcou = str(uuid.uuid4()).upper()
+    
 
-        session.run(
-            "MERGE (n:Base {name:$domain}) SET n:Domain, n.highvalue=true, n.objectid=$objectid",
-            domain=self.domain,
-            objectid=self.base_sid
-        )
-        ddp = str(uuid.uuid4())
-        ddcp = str(uuid.uuid4())
-        dcou = str(uuid.uuid4())
-        base_statement = "MERGE (n:Base {name:$gpo, objectid:$guid}) SET n:GPO"
-        session.run(base_statement, gpo=get_cn("DEFAULT DOMAIN POLICY", self.domain), guid=ddp)
-        session.run(base_statement, gpo=get_cn("DEFAULT DOMAIN CONTROLLERS POLICY", self.domain), guid=ddp)
-        session.run("MERGE (n:Base {name:$ou, objectid:$guid, blocksInheritance: false}) SET n:OU", ou=get_cn("DOMAIN CONTROLLERS", self.domain), guid=dcou)
+        print("Generating default GPOs")
+        generate_default_gpos(session, self.domain, ddp, ddcp)
+
+        print("Generating Domain Controllers OU")
+        generate_domain_controllers_ou(session, self.domain, dcou)
 
         print("Adding Standard Edges")
 
@@ -364,7 +314,8 @@ class MainMenu(cmd.Cmd):
             'MERGE (n:Domain {name:$domain}) MERGE (m:OU {objectid:$guid}) MERGE (n)-[:Contains {isacl:false}]->(m)', domain=self.domain, guid=dcou)
         gpo_name = "DEFAULT DOMAIN CONTROLLERS POLICY@{}".format(self.domain)
         session.run(
-            'MERGE (n:GPO {name:"DEFAULT DOMAIN CONTROLLERS POLICY@$domain"}) MERGE (m:OU {objectid:$guid}) MERGE (n)-[:GpLink {isacl:false, enforced:toBoolean(false)}]->(m)', domain=self.domain, guid=dcou)
+            'MERGE (n:GPO {objectid:$gpoguid}) MERGE (m:OU {objectid:$ouguid}) MERGE (n)-[:GpLink {isacl:false, enforced:toBoolean(false)}]->(m)', gpoguid=ddcp, ouguid=dcou)
+
 
         # Ent Admins -> Domain Node
         group_name = "ENTERPRISE ADMINS@{}".format(self.domain)

@@ -1,7 +1,7 @@
 from templates.groups import STANDARD_GROUPS
 
 
-def get_forest_standard_groups_list(domain_name, domain_sid):
+def get_forest_default_groups_list(domain_name, domain_sid):
     groups_list = STANDARD_GROUPS
     for group in groups_list:
         group = set_group_attributes(group, domain_name, domain_sid)
@@ -10,7 +10,7 @@ def get_forest_standard_groups_list(domain_name, domain_sid):
 
 def get_forest_standard_group_members_list(domain_name, domain_sid):
     forest_members_list = []
-    groups_list = get_forest_standard_groups_list(domain_name, domain_sid)
+    groups_list = get_forest_default_groups_list(domain_name, domain_sid)
     for group in groups_list:
         domain_members_list = group["Members"]
         for member in domain_members_list:
