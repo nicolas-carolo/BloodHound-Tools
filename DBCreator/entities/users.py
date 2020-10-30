@@ -29,3 +29,19 @@ def set_user_attributes(user, domain_name, domain_sid):
 
 def get_standard_users_list():
     return [GUEST_USER, DEFAULT_ACCOUNT, ADMINISTRATOR, KRBTGT]
+
+
+def get_forest_user_sid_list(domain_name, domain_sid):
+    user_sid_list = []
+    domain_users_list = []
+    for user in get_standard_users_list():
+        domain_users_list.append(set_user_attributes(user, domain_name, domain_sid))
+    for user in domain_users_list:
+        item = {
+            "DomainId": domain_sid,
+            "DomainName": str(domain_name).upper(),
+            "ObjectId": user["ObjectIdentifier"],
+            "ObjectType": "User"
+        }
+        user_sid_list.append(item)
+    return user_sid_list

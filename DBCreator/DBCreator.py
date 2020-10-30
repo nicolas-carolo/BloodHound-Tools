@@ -22,7 +22,8 @@ import uuid
 import time
 
 from entities.groups import get_forest_standard_groups_list, get_forest_standard_group_members_list
-from entities.users import get_guest_user, get_default_account, get_administrator_user, get_krbtgt_user
+from entities.users import get_guest_user, get_default_account, get_administrator_user, get_krbtgt_user,\
+    get_forest_user_sid_list
 from entities.acls import get_standard_group_aces_list, get_standard_user_aces_list, get_standard_all_extended_rights,\
     get_standard_generic_write, get_standard_owns, get_standard_write_dacl, get_standard_write_owner,\
     get_standard_generic_all
@@ -662,6 +663,12 @@ class MainMenu(cmd.Cmd):
                 )
         
 
+        print("Adding default User nodes to the domain")
+        standard_users_list = get_forest_user_sid_list(self.domain, self.base_sid)
+        for user in standard_users_list:
+            self.add_contains_object_on_domain_relationship(session, user)
+        
+
         print("Generating User Nodes")
         current_time = int(time.time())
         group_name = "DOMAIN USERS@{}".format(self.domain)
@@ -1178,6 +1185,12 @@ class MainMenu(cmd.Cmd):
     def add_right_relationship(self, session, ad_object):
         query = "MATCH (identityReferenceItem:" + ad_object["IdentityReferenceType"] + " {objectid: '" + ad_object["IdentityReferenceId"] + "'}), (objectItem:" + ad_object["ObjectType"] + " {objectid: '" + ad_object["ObjectId"] + "'})"
         query = query + "\nMERGE (identityReferenceItem)-[:" + ad_object["Right"] + " {isinherited: " + str(ad_object["IsInherited"]) + "}]->(objectItem)"
+        session.run(query)
+    
+
+    def add_contains_object_on_domain_relationship(self, session, ad_object):
+        query = "MATCH (objectItem:" + ad_object["ObjectType"] + " {objectid: '" + ad_object["ObjectId"] + "'}), (domainItem:Domain {objectid: '" + ad_object["DomainId"] + "'})"
+        query = query + "\nMERGE (domainItem)-[:Contains]->(objectItem)"
         session.run(query)
 
 
