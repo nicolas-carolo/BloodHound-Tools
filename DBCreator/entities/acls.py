@@ -46,7 +46,7 @@ def get_standard_user_aces_list(domain_name, domain_sid):
 
 def get_standard_all_extended_rights(users_list, domain_admins_list, domain_name, domain_sid):
     aces_list = []
-    administrators_sid = str(domain_name).upper() + "-" + "S-1-5-32-544"
+    administrators_sid = str(domain_name).upper() + "-S-1-5-32-544"
     enterprise_admins_sid = domain_sid + "-519"
     domain_admins_sid = domain_sid + "-512"
     for group_sid in [administrators_sid, domain_admins_sid]:
@@ -94,10 +94,11 @@ def get_standard_all_extended_rights(users_list, domain_admins_list, domain_name
     return aces_list
 
 
-def get_standard_generic_write(computers_list, users_list, domain_admins_list, domain_name, domain_sid):
+def get_standard_generic_write(computers_list, users_list, gpos_list, domain_admins_list, domain_name, domain_sid):
     aces_list = []
-    administrators_sid = str(domain_name).upper() + "-" + "S-1-5-32-544"
+    administrators_sid = str(domain_name).upper() + "-S-1-5-32-544"
     enterprise_admins_sid = domain_sid + "-519"
+    domain_admins_sid = domain_sid + "-512"
     for computer in computers_list:
         ace = {
             "ObjectId": computer["id"],
@@ -122,13 +123,6 @@ def get_standard_generic_write(computers_list, users_list, domain_admins_list, d
             "IsInherited": is_inherited
         }
         aces_list.append(ace)
-    return aces_list
-
-
-def get_standard_generic_write_on_gpos(gpos_list, domain_name, domain_sid):
-    aces_list = []
-    enterprise_admins_sid = domain_sid + "-519"
-    domain_admins_sid = domain_sid + "-512"
     for group_sid in [enterprise_admins_sid, domain_admins_sid]:
         for gpo in gpos_list:
             ace = {
@@ -140,7 +134,7 @@ def get_standard_generic_write_on_gpos(gpos_list, domain_name, domain_sid):
                 "IsInherited": False
             }
             aces_list.append(ace)
-    return aces_list
+    return aces_list    
 
 
 def get_standard_owns(computers_list, users_list, ous_list, gpos_list, domain_name, domain_sid):
@@ -191,7 +185,7 @@ def get_standard_owns(computers_list, users_list, ous_list, gpos_list, domain_na
 
 def get_standard_write_dacl(dc_ou_sid, computers_list, users_list, ous_list, gpos_list, domain_admins_list, domain_name, domain_sid):
     aces_list = []
-    administrators_sid = str(domain_name).upper() + "-" + "S-1-5-32-544"
+    administrators_sid = str(domain_name).upper() + "-S-1-5-32-544"
     enterprise_admins_sid = domain_sid + "-519"
     domain_admins_sid = domain_sid + "-512"
     for computer in computers_list:
@@ -273,7 +267,7 @@ def get_standard_write_dacl(dc_ou_sid, computers_list, users_list, ous_list, gpo
 
 def get_standard_write_owner(dc_ou_sid, computers_list, users_list, ous_list, gpos_list, domain_admins_list, domain_name, domain_sid):
     aces_list = []
-    administrators_sid = str(domain_name).upper() + "-" + "S-1-5-32-544"
+    administrators_sid = str(domain_name).upper() + "-S-1-5-32-544"
     enterprise_admins_sid = domain_sid + "-519"
     domain_admins_sid = domain_sid + "-512"
     for computer in computers_list:
@@ -445,7 +439,7 @@ def get_standard_generic_all(dc_ou_sid, dcs_list, computers_list, users_list, ou
 
 
 def get_dc_ou_isinherited_value(group_sid, domain_name):
-    if group_sid == str(domain_name).upper() + "-" + "S-1-5-32-544":
+    if group_sid == str(domain_name).upper() + "-S-1-5-32-544":
         return True
     else:
         return False
