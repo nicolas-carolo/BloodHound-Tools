@@ -30,9 +30,10 @@ from entities.acls import get_standard_group_aces_list, get_standard_user_aces_l
 from utils.principals import get_cn, get_sid_from_rid
 from generators.groups import generate_default_groups
 from generators.domains import generate_domain
-from generators.gpos import generate_default_gpos
+from generators.gpos import generate_default_gpos, link_default_gpos
 from generators.ous import generate_domain_controllers_ou
-
+from generators.acls import generate_enterprise_admins_acls, generate_administrators_acls, generate_domain_admins_acls,\
+    generate_default_groups_acls
 
 
 class Messages():
@@ -306,61 +307,20 @@ class MainMenu(cmd.Cmd):
 
         print("Adding Standard Edges")
 
-        # Default GPOs
-        gpo_name = "DEFAULT DOMAIN POLICY@{}".format(self.domain)
-        session.run(
-            'MERGE (n:GPO {name:$gpo}) MERGE (m:Domain {name:$domain}) MERGE (n)-[:GpLink {isacl:false, enforced:toBoolean(false)}]->(m)', gpo=gpo_name, domain=self.domain)
-        session.run(
-            'MERGE (n:Domain {name:$domain}) MERGE (m:OU {objectid:$guid}) MERGE (n)-[:Contains {isacl:false}]->(m)', domain=self.domain, guid=dcou)
-        gpo_name = "DEFAULT DOMAIN CONTROLLERS POLICY@{}".format(self.domain)
-        session.run(
-            'MERGE (n:GPO {objectid:$gpoguid}) MERGE (m:OU {objectid:$ouguid}) MERGE (n)-[:GpLink {isacl:false, enforced:toBoolean(false)}]->(m)', gpoguid=ddcp, ouguid=dcou)
+        print("Linking Default GPOs")
+        link_default_gpos(session, self.domain, ddp, ddcp, dcou)
 
+        print("Generating Enterprise Admins ACLs")
+        generate_enterprise_admins_acls(session, self.domain)
 
-        # Ent Admins -> Domain Node
-        group_name = "ENTERPRISE ADMINS@{}".format(self.domain)
-        session.run(
-            'MERGE (n:Domain {name:$domain}) MERGE (m:Group {name:$gname}) MERGE (m)-[:GenericAll {isacl:true, isinherited: false}]->(n)', domain=self.domain, gname=group_name)
+        print("Generating Administrators ACLs")
+        generate_administrators_acls(session, self.domain)
 
-        # Administrators -> Domain Node
-        group_name = "ADMINISTRATORS@{}".format(self.domain)
-        session.run(
-            'MERGE (n:Domain {name:$domain}) MERGE (m:Group {name:$gname}) MERGE (m)-[:Owns {isacl:true}]->(n)', domain=self.domain, gname=group_name)
-        session.run(
-            'MERGE (n:Domain {name:$domain}) WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (m)-[:WriteOwner {isacl:true}]->(n)', domain=self.domain, gname=group_name)
-        session.run(
-            'MERGE (n:Domain {name:$domain}) WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (m)-[:WriteDacl {isacl:true, isinherited: false}]->(n)', domain=self.domain, gname=group_name)
-        session.run(
-            'MERGE (n:Domain {name:$domain}) WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (m)-[:DCSync {isacl:true}]->(n)', domain=self.domain, gname=group_name)
-        session.run(
-            'MERGE (n:Domain {name:$domain}) WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (m)-[:GetChanges {isacl:true}]->(n)', domain=self.domain, gname=group_name)
-        session.run(
-            'MERGE (n:Domain {name:$domain}) WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (m)-[:GetChangesAll {isacl:true}]->(n)', domain=self.domain, gname=group_name)
+        print("Generating Domain Admins ACLs")
+        generate_domain_admins_acls(session, self.domain)
 
-        # Domain Admins -> Domain Node
-        group_name = "DOMAIN ADMINS@{}".format(self.domain)
-        session.run(
-            'MERGE (n:Domain {name:$domain}) WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (m)-[:WriteOwner {isacl:true}]->(n)', domain=self.domain, gname=group_name)
-        session.run(
-            'MERGE (n:Domain {name:$domain}) WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (m)-[:WriteDacl {isacl:true, isinherited: false}]->(n)', domain=self.domain, gname=group_name)
-        session.run(
-            'MERGE (n:Domain {name:$domain}) WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (m)-[:DCSync {isacl:true}]->(n)', domain=self.domain, gname=group_name)
-        session.run(
-            'MERGE (n:Domain {name:$domain}) WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (m)-[:GetChanges {isacl:true}]->(n)', domain=self.domain, gname=group_name)
-        session.run(
-            'MERGE (n:Domain {name:$domain}) WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (m)-[:GetChangesAll {isacl:true}]->(n)', domain=self.domain, gname=group_name)
-
-        # DC Groups -> Domain Node
-        group_name = "ENTERPRISE DOMAIN CONTROLLERS@{}".format(self.domain)
-        session.run(
-            'MERGE (n:Domain {name:$domain}) WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (m)-[:GetChanges {isacl:true}]->(n)', domain=self.domain, gname=group_name)
-        group_name = "ENTERPRISE READ-ONLY DOMAIN CONTROLLERS@{}".format(
-            self.domain)
-        session.run(
-            'MERGE (n:Domain {name:$domain}) WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (m)-[:GetChanges {isacl:true}]->(n)', domain=self.domain, gname=group_name)
-        group_name = "DOMAIN CONTROLLERS@{}".format(self.domain)
-        session.run(
-            'MERGE (n:Domain {name:$domain}) WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (m)-[:GetChangesAll {isacl:true}]->(n)', domain=self.domain, gname=group_name)
+        print("Generating DC Groups ACLs")
+        generate_default_groups_acls(session, self.domain)
 
         print("Generating Computer Nodes")
         group_name = "DOMAIN COMPUTERS@{}".format(self.domain)
