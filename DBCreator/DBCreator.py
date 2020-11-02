@@ -34,7 +34,7 @@ from generators.acls import generate_enterprise_admins_acls, generate_administra
 from generators.computers import generate_computers, generate_dcs, generate_default_admin_to
 from generators.users import generate_guest_user, generate_default_account, generate_administrator, generate_krbtgt_user,\
     generate_users, link_default_users_to_domain
-from generators.groups import generate_groups, generate_domain_administrators, generate_default_member_of
+from generators.groups import generate_groups, generate_domain_administrators, generate_default_member_of, nest_groups
 
 from templates.groups import WEIGHTED_PARTS
 
@@ -357,31 +357,9 @@ class MainMenu(cmd.Cmd):
 
         print("Adding members to default groups")
         generate_default_member_of(session, self.domain, self.base_sid)
-        
-
 
         print("Applying random group nesting")
-        max_nest = int(round(math.log10(self.num_nodes)))
-        props = []
-        for group in groups:
-            if (random.randrange(0, 100) < 10):
-                num_nest = random.randrange(1, max_nest)
-                dept = group[0:-19]
-                dpt_groups = [x for x in groups if dept in x]
-                if num_nest > len(dpt_groups):
-                    num_nest = random.randrange(1, len(dpt_groups))
-                to_nest = random.sample(dpt_groups, num_nest)
-                for g in to_nest:
-                    if not g == group:
-                        props.append({'a': group, 'b': g})
-
-            if (len(props) > 500):
-                session.run(
-                    'UNWIND $props AS prop MERGE (n:Group {name:prop.a}) WITH n,prop MERGE (m:Group {name:prop.b}) WITH n,m MERGE (n)-[:MemberOf]->(m)', props=props)
-                props = []
-
-        session.run(
-            'UNWIND $props AS prop MERGE (n:Group {name:prop.a}) WITH n,prop MERGE (m:Group {name:prop.b}) WITH n,m MERGE (n)-[:MemberOf]->(m)', props=props)
+        nest_groups(session, self.num_nodes, groups)
 
         print("Adding users to groups")
         props = []

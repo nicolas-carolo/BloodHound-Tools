@@ -104,3 +104,25 @@ def add_member_of_relationship(session, ad_object):
     query = "MATCH (memberItem:" + ad_object["MemberType"] + " {objectid: '" + ad_object["MemberId"] + "'}), (groupItem:Group {objectid: '" + ad_object["GroupId"] + "'})"
     query = query + "\nMERGE (memberItem)-[:MemberOf]->(groupItem)"
     session.run(query)
+
+
+def nest_groups(session, num_nodes, groups):
+    max_nest = int(round(math.log10(num_nodes)))
+    props = []
+    for group in groups:
+        if (random.randrange(0, 100) < 10):
+            num_nest = random.randrange(1, max_nest)
+            dept = group[0:-19]
+            dpt_groups = [x for x in groups if dept in x]
+            if num_nest > len(dpt_groups):
+                num_nest = random.randrange(1, len(dpt_groups))
+            to_nest = random.sample(dpt_groups, num_nest)
+            for g in to_nest:
+                if not g == group:
+                    props.append({'a': group, 'b': g})
+
+        if (len(props) > 500):
+            session.run('UNWIND $props AS prop MERGE (n:Group {name:prop.a}) WITH n,prop MERGE (m:Group {name:prop.b}) WITH n,m MERGE (n)-[:MemberOf]->(m)', props=props)
+            props = []
+
+    session.run('UNWIND $props AS prop MERGE (n:Group {name:prop.a}) WITH n,prop MERGE (m:Group {name:prop.b}) WITH n,m MERGE (n)-[:MemberOf]->(m)', props=props)
