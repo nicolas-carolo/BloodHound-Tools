@@ -109,4 +109,4 @@ def generate_users(session, domain_name, domain_sid, num_nodes, current_time, fi
             props = []
 
     session.run('UNWIND $props as prop MERGE (n:Base {objectid:prop.id}) SET n:User, n += prop.props WITH n MATCH (m:Group {name:$gname}) WITH n,m MERGE (n)-[:MemberOf]->(m)', props=props, gname=group_name)
-    return user_properties_list, ridcount
+    return user_properties_list, users, ridcount

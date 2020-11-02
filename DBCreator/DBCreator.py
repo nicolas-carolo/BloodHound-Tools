@@ -33,9 +33,12 @@ from generators.gpos import generate_default_gpos, link_default_gpos
 from generators.ous import generate_domain_controllers_ou
 from generators.acls import generate_enterprise_admins_acls, generate_administrators_acls, generate_domain_admins_acls,\
     generate_default_groups_acls
-from generators.computers import generate_computers, generate_dcs
+from generators.computers import generate_computers, generate_dcs, generate_default_admin_to
 from generators.users import generate_guest_user, generate_default_account, generate_administrator, generate_krbtgt_user,\
     generate_users
+from generators.groups import generate_groups
+
+from templates.groups import WEIGHTED_PARTS
 
 
 class Messages():
@@ -324,7 +327,7 @@ class MainMenu(cmd.Cmd):
         generate_default_groups_acls(session, self.domain)
 
         print("Generating Computer Nodes")
-        computer_properties_list, ridcount = generate_computers(session, self.domain, self.base_sid, self.num_nodes, computers)
+        computer_properties_list, computers, ridcount = generate_computers(session, self.domain, self.base_sid, self.num_nodes, computers)
 
         print("Generating Domain Controllers")
         dc_properties_list, ridcount = generate_dcs(session, self.domain, self.base_sid, dcou, ridcount)
@@ -348,30 +351,15 @@ class MainMenu(cmd.Cmd):
         
 
         print("Generating User Nodes")
-        user_properties_list, ridcount = generate_users(session, self.domain, self.base_sid, self.num_nodes, self.current_time, self.first_names, self.last_names, users, ridcount)
+        user_properties_list, users, ridcount = generate_users(session, self.domain, self.base_sid, self.num_nodes, self.current_time, self.first_names, self.last_names, users, ridcount)
 
         print("Generating Group Nodes")
-        weighted_parts = ["IT"] * 7 + ["HR"] * 13 + \
-            ["MARKETING"] * 30 + ["OPERATIONS"] * 20 + ["BIDNESS"] * 30
-        props = []
-        for i in range(1, self.num_nodes + 1):
-            dept = random.choice(weighted_parts)
-            group_name = "{}{:05d}@{}".format(dept, i, self.domain)
-            groups.append(group_name)
-            sid = get_sid_from_rid(ridcount, self.base_sid)
-            ridcount += 1
-            props.append({'name': group_name, 'id': sid})
-            if len(props) > 500:
-                session.run(
-                    'UNWIND $props as prop MERGE (n:Base {objectid:prop.id}) SET n:Group, n.name=prop.name', props=props)
-                props = []
+        groups, ridcount = generate_groups(session, self.domain, self.base_sid, self.num_nodes, groups, ridcount)
 
-        session.run(
-            'UNWIND $props as prop MERGE (n:Base {objectid:prop.id}) SET n:Group, n.name=prop.name', props=props)
+
 
         print("Adding Domain Admins to Local Admins of Computers")
-        session.run(
-            'MATCH (n:Computer) MATCH (m:Group {objectid: $id}) MERGE (m)-[:AdminTo]->(n)', id=get_sid_from_rid(512, self.base_sid))
+        generate_default_admin_to(session, self.base_sid)
 
         dapctint = random.randint(3, 5)
         dapct = float(dapctint) / 100
@@ -431,7 +419,7 @@ class MainMenu(cmd.Cmd):
         print("Calculated {} groups per user with a variance of - {}".format(num_groups_base, variance*2))
 
         for user in users:
-            dept = random.choice(weighted_parts)
+            dept = random.choice(WEIGHTED_PARTS)
             if dept == "IT":
                 it_users.append(user)
             possible_groups = [x for x in groups if dept in x]

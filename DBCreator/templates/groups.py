@@ -1,3 +1,7 @@
+WEIGHTED_PARTS = ["IT"] * 7 + ["HR"] * 13 + \
+            ["MARKETING"] * 30 + ["OPERATIONS"] * 20 + ["BIDNESS"] * 30
+
+
 STANDARD_GROUPS = [
     {
         "Properties": {

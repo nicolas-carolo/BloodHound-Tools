@@ -30,7 +30,7 @@ def generate_computers(session, domain_name, domain_sid, num_nodes, computers):
             session.run('UNWIND $props as prop MERGE (n:Base {objectid: prop.id}) SET n:Computer, n += prop.props WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (n)-[:MemberOf]->(m)', props=props, gname=group_name)
             props = []
     session.run('UNWIND $props as prop MERGE (n:Base {objectid:prop.id}) SET n:Computer, n += prop.props WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (n)-[:MemberOf]->(m)', props=props, gname=group_name)
-    return computer_properties_list, ridcount
+    return computer_properties_list, computers, ridcount
 
 
 def generate_dcs(session, domain_name, domain_sid, dcou, ridcount):
@@ -51,3 +51,7 @@ def generate_dcs(session, domain_name, domain_sid, dcou, ridcount):
         session.run('MATCH (n:Computer {objectid:$sid}) WITH n MATCH (m:Group {name:$gname}) WITH n,m MERGE (n)-[:MemberOf]->(m)', sid=sid, gname=get_name("ENTERPRISE DOMAIN CONTROLLERS", domain_name))
         session.run('MERGE (n:Computer {objectid:$sid}) WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (m)-[:AdminTo]->(n)', sid=sid, gname=get_name("DOMAIN ADMINS", domain_name))
     return dc_properties_list, ridcount
+
+
+def generate_default_admin_to(session, domain_sid):
+    session.run('MATCH (n:Computer) MATCH (m:Group {objectid: $id}) MERGE (m)-[:AdminTo]->(n)', id=get_sid_from_rid(512, domain_sid))
