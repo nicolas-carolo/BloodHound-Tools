@@ -11,8 +11,7 @@ def generate_default_groups(session, domain_name, domain_sid):
                 MERGE (n:Base {name: $gname}) SET n:Group, n.objectid=$sid,
                 n.highvalue=$highvalue, n.domain=$domain,
                 n.distinguishedname=$distinguishedname,
-                n.description=$description, n.admincount=$admincount,
-                n.default=true
+                n.description=$description, n.admincount=$admincount
                 """,
                 gname=default_group["Properties"]["name"],
                 sid=default_group["ObjectIdentifier"],
@@ -50,8 +49,7 @@ def generate_default_groups(session, domain_name, domain_sid):
                 MERGE (n:Base {name: $gname}) SET n:Group, n.objectid=$sid,
                 n.highvalue=$highvalue, n.domain=$domain,
                 n.distinguishedname=$distinguishedname,
-                n.description=$description, n.admincount=$admincount,
-                n.default=true
+                n.description=$description, n.admincount=$admincount
                 """,
                 gname=default_group["Properties"]["name"],
                 sid=default_group["ObjectIdentifier"],

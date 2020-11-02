@@ -1,0 +1,1 @@
+STATES = ["WA", "MD", "AL", "IN", "NV", "VA", "CA", "NY", "TX", "FL"]

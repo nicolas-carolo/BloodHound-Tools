@@ -1,5 +1,9 @@
-def get_cn(name, domain_name):
+def get_name(name, domain_name):
     return f"{name}@{domain_name}"
+
+
+def get_cn(name):
+    return str(name).upper().split("@")[0]
 
 
 def get_sid_from_rid(rid, domain_sid):

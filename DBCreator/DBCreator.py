@@ -27,13 +27,15 @@ from entities.users import get_guest_user, get_default_account, get_administrato
 from entities.acls import get_standard_group_aces_list, get_standard_user_aces_list, get_standard_all_extended_rights,\
     get_standard_generic_write, get_standard_owns, get_standard_write_dacl, get_standard_write_owner,\
     get_standard_generic_all
-from utils.principals import get_cn, get_sid_from_rid
+from utils.principals import get_name, get_sid_from_rid
 from generators.groups import generate_default_groups
 from generators.domains import generate_domain
 from generators.gpos import generate_default_gpos, link_default_gpos
 from generators.ous import generate_domain_controllers_ou
 from generators.acls import generate_enterprise_admins_acls, generate_administrators_acls, generate_domain_admins_acls,\
     generate_default_groups_acls
+from generators.computers import generate_computers, generate_dcs
+from generators.users import generate_guest_user, generate_default_account, generate_administrator, generate_krbtgt_user
 
 
 class Messages():
@@ -273,13 +275,10 @@ class MainMenu(cmd.Cmd):
         ou_guid_map = {}
         ou_properties_list = []
 
-        used_states = []
+        # used_states = []
 
         states = ["WA", "MD", "AL", "IN", "NV", "VA", "CA", "NY", "TX", "FL"]
         partitions = ["IT", "HR", "MARKETING", "OPERATIONS", "BIDNESS"]
-        os_list = ["Windows Server 2003"] * 1 + ["Windows Server 2008"] * 15 + ["Windows 7"] * 35 + \
-            ["Windows 10"] * 28 + ["Windows XP"] * 1 + \
-            ["Windows Server 2012"] * 8 + ["Windows Server 2008"] * 12
         
         session = self.driver.session()
 
@@ -323,226 +322,21 @@ class MainMenu(cmd.Cmd):
         generate_default_groups_acls(session, self.domain)
 
         print("Generating Computer Nodes")
-        group_name = "DOMAIN COMPUTERS@{}".format(self.domain)
-        props = []
-        ridcount = 1000
-        for i in range(1, self.num_nodes+1):
-            comp_name = "COMP{:05d}.{}".format(i, self.domain)
-            computers.append(comp_name)
-            os = random.choice(os_list)
-            enabled = True
-            computer_property = {
-                'id': get_sid_from_rid(ridcount, self.base_sid),
-                'props': {
-                    'name': comp_name,
-                    'operatingsystem': os,
-                    'enabled': enabled,
-                }
-            }
-            props.append(computer_property)
-            computer_properties_list.append(computer_property)
-            ridcount += 1
+        computer_properties_list, ridcount = generate_computers(session, self.domain, self.base_sid, self.num_nodes, computers)
 
-            if (len(props) > 500):
-                session.run(
-                    'UNWIND $props as prop MERGE (n:Base {objectid: prop.id}) SET n:Computer, n += prop.props WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (n)-[:MemberOf]->(m)', props=props, gname=group_name)
-                props = []
-        session.run(
-            'UNWIND $props as prop MERGE (n:Base {objectid:prop.id}) SET n:Computer, n += prop.props WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (n)-[:MemberOf]->(m)', props=props, gname=group_name)
+        print("Generating Domain Controllers")
+        dc_properties_list = generate_dcs(session, self.domain, self.base_sid, dcou, ridcount)
+        # print(dc_properties_list)
 
-        print("Creating Domain Controllers")
-        for state in states:
-            comp_name = get_cn(f"{state}LABDC", self.domain)
-            group_name = get_cn("DOMAIN CONTROLLERS", self.domain)
-            sid = get_sid_from_rid(ridcount, self.base_sid)
-            dc_properties = {
-                'name': comp_name,
-                'id': sid
-            }
-            dc_properties_list.append(dc_properties)
-            session.run(
-                'MERGE (n:Base {objectid:$sid}) SET n:Computer,n.name=$name WITH n MATCH (m:Group {name:$gname}) WITH n,m MERGE (n)-[:MemberOf]->(m)', sid=sid, name=comp_name, gname=group_name)
-            session.run(
-                'MATCH (n:Computer {objectid:$sid}) WITH n MATCH (m:OU {objectid:$dcou}) WITH n,m MERGE (m)-[:Contains]->(n)', sid=sid, dcou=dcou)
-            session.run(
-                'MATCH (n:Computer {objectid:$sid}) WITH n MATCH (m:Group {name:$gname}) WITH n,m MERGE (n)-[:MemberOf]->(m)', sid=sid, gname=get_cn("ENTERPRISE DOMAIN CONTROLLERS", self.domain))
-            session.run(
-                'MERGE (n:Computer {objectid:$sid}) WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (m)-[:AdminTo]->(n)', sid=sid, gname=get_cn("DOMAIN ADMINS", self.domain))
 
-        used_states = list(set(used_states))
+        # used_states = list(set(used_states))
+        # print(used_states)
 
         print("Generating default User Nodes")
-        guest_user = get_guest_user(self.domain, self.base_sid)
-        session.run(
-                    """
-                    MERGE (n:Base {name: $name}) SET n:User, n.objectid=$sid,
-                    n.highvalue=$highvalue, n.domain=$domain,
-                    n.distinguishedname=$distinguishedname,
-                    n.description=$description, n.admincount=$admincount,
-                    n.dontreqpreauth=$dontreqpreauth, n.passwordnotreqd=$passwordnotreqd,
-                    n.unconstraineddelegation=$unconstraineddelegation,
-                    n.sensitive=$sensitive, n.enabled=$enabled,
-                    n.pwdneverexpires=$pwdneverexpires, n.lastlogon=$lastlogon,
-                    n.lastlogontimestamp=$lastlogontimestamp, n.pwdlastset=$pwdlastset,
-                    n.serviceprincipalnames=$serviceprincipalnames, n.hasspn=$hasspn,
-                    n.displayname=$displayname, n.email=$email, n.title=$title,
-                    n.homedirectory=$homedirectory, n.userpassword=$userpassword,
-                    n.sidhistory=$sidhistory
-                    """,
-                    name=guest_user["Properties"]["name"],
-                    sid=guest_user["ObjectIdentifier"],
-                    highvalue=guest_user["Properties"]["highvalue"],
-                    domain=guest_user["Properties"]["domain"],
-                    distinguishedname=guest_user["Properties"]["distinguishedname"],
-                    description=guest_user["Properties"]["description"],
-                    admincount=guest_user["Properties"]["admincount"],
-                    dontreqpreauth=guest_user["Properties"]["dontreqpreauth"],
-                    passwordnotreqd=guest_user["Properties"]["passwordnotreqd"],
-                    unconstraineddelegation=guest_user["Properties"]["unconstraineddelegation"],
-                    sensitive=guest_user["Properties"]["sensitive"],
-                    enabled=random.choice([True, False]),
-                    pwdneverexpires=random.choice([True, False]),
-                    lastlogon=guest_user["Properties"]["lastlogon"],
-                    lastlogontimestamp=guest_user["Properties"]["lastlogontimestamp"],
-                    pwdlastset=guest_user["Properties"]["pwdlastset"],
-                    serviceprincipalnames=guest_user["Properties"]["serviceprincipalnames"],
-                    hasspn=guest_user["Properties"]["hasspn"],
-                    displayname=guest_user["Properties"]["displayname"],
-                    email=guest_user["Properties"]["email"],
-                    title=guest_user["Properties"]["title"],
-                    homedirectory=guest_user["Properties"]["homedirectory"],
-                    userpassword=guest_user["Properties"]["userpassword"],
-                    sidhistory=guest_user["Properties"]["sidhistory"]
-                )
-        
-        default_account = get_default_account(self.domain, self.base_sid)
-        session.run(
-                    """
-                    MERGE (n:Base {name: $name}) SET n:User, n.objectid=$sid,
-                    n.highvalue=$highvalue, n.domain=$domain,
-                    n.distinguishedname=$distinguishedname,
-                    n.description=$description, n.admincount=$admincount,
-                    n.dontreqpreauth=$dontreqpreauth, n.passwordnotreqd=$passwordnotreqd,
-                    n.unconstraineddelegation=$unconstraineddelegation,
-                    n.sensitive=$sensitive, n.enabled=$enabled,
-                    n.pwdneverexpires=$pwdneverexpires, n.lastlogon=$lastlogon,
-                    n.lastlogontimestamp=$lastlogontimestamp, n.pwdlastset=$pwdlastset,
-                    n.serviceprincipalnames=$serviceprincipalnames, n.hasspn=$hasspn,
-                    n.displayname=$displayname, n.email=$email, n.title=$title,
-                    n.homedirectory=$homedirectory, n.userpassword=$userpassword,
-                    n.sidhistory=$sidhistory
-                    """,
-                    name=default_account["Properties"]["name"],
-                    sid=default_account["ObjectIdentifier"],
-                    highvalue=default_account["Properties"]["highvalue"],
-                    domain=default_account["Properties"]["domain"],
-                    distinguishedname=default_account["Properties"]["distinguishedname"],
-                    description=default_account["Properties"]["description"],
-                    admincount=default_account["Properties"]["admincount"],
-                    dontreqpreauth=default_account["Properties"]["dontreqpreauth"],
-                    passwordnotreqd=default_account["Properties"]["passwordnotreqd"],
-                    unconstraineddelegation=default_account["Properties"]["unconstraineddelegation"],
-                    sensitive=default_account["Properties"]["sensitive"],
-                    enabled=default_account["Properties"]["enabled"],
-                    pwdneverexpires=default_account["Properties"]["pwdneverexpires"],
-                    lastlogon=default_account["Properties"]["lastlogon"],
-                    lastlogontimestamp=default_account["Properties"]["lastlogontimestamp"],
-                    pwdlastset=default_account["Properties"]["pwdlastset"],
-                    serviceprincipalnames=default_account["Properties"]["serviceprincipalnames"],
-                    hasspn=default_account["Properties"]["hasspn"],
-                    displayname=default_account["Properties"]["displayname"],
-                    email=default_account["Properties"]["email"],
-                    title=default_account["Properties"]["title"],
-                    homedirectory=default_account["Properties"]["homedirectory"],
-                    userpassword=default_account["Properties"]["userpassword"],
-                    sidhistory=default_account["Properties"]["sidhistory"]
-                )
-        
-        administrator_user = get_administrator_user(self.domain, self.base_sid)
-        session.run(
-                    """
-                    MERGE (n:Base {name: $name}) SET n:User, n.objectid=$sid,
-                    n.highvalue=$highvalue, n.domain=$domain,
-                    n.distinguishedname=$distinguishedname,
-                    n.description=$description, n.admincount=$admincount,
-                    n.dontreqpreauth=$dontreqpreauth, n.passwordnotreqd=$passwordnotreqd,
-                    n.unconstraineddelegation=$unconstraineddelegation,
-                    n.sensitive=$sensitive, n.enabled=$enabled,
-                    n.pwdneverexpires=$pwdneverexpires, n.lastlogon=$lastlogon,
-                    n.lastlogontimestamp=$lastlogontimestamp, n.pwdlastset=$pwdlastset,
-                    n.serviceprincipalnames=$serviceprincipalnames, n.hasspn=$hasspn,
-                    n.displayname=$displayname, n.email=$email, n.title=$title,
-                    n.homedirectory=$homedirectory, n.userpassword=$userpassword,
-                    n.sidhistory=$sidhistory
-                    """,
-                    name=administrator_user["Properties"]["name"],
-                    sid=administrator_user["ObjectIdentifier"],
-                    highvalue=administrator_user["Properties"]["highvalue"],
-                    domain=administrator_user["Properties"]["domain"],
-                    distinguishedname=administrator_user["Properties"]["distinguishedname"],
-                    description=administrator_user["Properties"]["description"],
-                    admincount=administrator_user["Properties"]["admincount"],
-                    dontreqpreauth=administrator_user["Properties"]["dontreqpreauth"],
-                    passwordnotreqd=administrator_user["Properties"]["passwordnotreqd"],
-                    unconstraineddelegation=administrator_user["Properties"]["unconstraineddelegation"],
-                    sensitive=administrator_user["Properties"]["sensitive"],
-                    enabled=administrator_user["Properties"]["enabled"],
-                    pwdneverexpires=administrator_user["Properties"]["pwdneverexpires"],
-                    lastlogon=administrator_user["Properties"]["lastlogon"],
-                    lastlogontimestamp=administrator_user["Properties"]["lastlogontimestamp"],
-                    pwdlastset=administrator_user["Properties"]["pwdlastset"],
-                    serviceprincipalnames=administrator_user["Properties"]["serviceprincipalnames"],
-                    hasspn=administrator_user["Properties"]["hasspn"],
-                    displayname=administrator_user["Properties"]["displayname"],
-                    email=administrator_user["Properties"]["email"],
-                    title=administrator_user["Properties"]["title"],
-                    homedirectory=administrator_user["Properties"]["homedirectory"],
-                    userpassword=administrator_user["Properties"]["userpassword"],
-                    sidhistory=administrator_user["Properties"]["sidhistory"]
-                )
-        
-        krbtgt_user = get_krbtgt_user(self.domain, self.base_sid)
-        session.run(
-                    """
-                    MERGE (n:Base {name: $name}) SET n:User, n.objectid=$sid,
-                    n.highvalue=$highvalue, n.domain=$domain,
-                    n.distinguishedname=$distinguishedname,
-                    n.description=$description, n.admincount=$admincount,
-                    n.dontreqpreauth=$dontreqpreauth, n.passwordnotreqd=$passwordnotreqd,
-                    n.unconstraineddelegation=$unconstraineddelegation,
-                    n.sensitive=$sensitive, n.enabled=$enabled,
-                    n.pwdneverexpires=$pwdneverexpires, n.lastlogon=$lastlogon,
-                    n.lastlogontimestamp=$lastlogontimestamp, n.pwdlastset=$pwdlastset,
-                    n.serviceprincipalnames=$serviceprincipalnames, n.hasspn=$hasspn,
-                    n.displayname=$displayname, n.email=$email, n.title=$title,
-                    n.homedirectory=$homedirectory, n.userpassword=$userpassword,
-                    n.sidhistory=$sidhistory
-                    """,
-                    name=krbtgt_user["Properties"]["name"],
-                    sid=krbtgt_user["ObjectIdentifier"],
-                    highvalue=krbtgt_user["Properties"]["highvalue"],
-                    domain=krbtgt_user["Properties"]["domain"],
-                    distinguishedname=krbtgt_user["Properties"]["distinguishedname"],
-                    description=krbtgt_user["Properties"]["description"],
-                    admincount=krbtgt_user["Properties"]["admincount"],
-                    dontreqpreauth=krbtgt_user["Properties"]["dontreqpreauth"],
-                    passwordnotreqd=krbtgt_user["Properties"]["passwordnotreqd"],
-                    unconstraineddelegation=krbtgt_user["Properties"]["unconstraineddelegation"],
-                    sensitive=krbtgt_user["Properties"]["sensitive"],
-                    enabled=krbtgt_user["Properties"]["enabled"],
-                    pwdneverexpires=krbtgt_user["Properties"]["pwdneverexpires"],
-                    lastlogon=krbtgt_user["Properties"]["lastlogon"],
-                    lastlogontimestamp=krbtgt_user["Properties"]["lastlogontimestamp"],
-                    pwdlastset=krbtgt_user["Properties"]["pwdlastset"],
-                    serviceprincipalnames=krbtgt_user["Properties"]["serviceprincipalnames"],
-                    hasspn=krbtgt_user["Properties"]["hasspn"],
-                    displayname=krbtgt_user["Properties"]["displayname"],
-                    email=krbtgt_user["Properties"]["email"],
-                    title=krbtgt_user["Properties"]["title"],
-                    homedirectory=krbtgt_user["Properties"]["homedirectory"],
-                    userpassword=krbtgt_user["Properties"]["userpassword"],
-                    sidhistory=krbtgt_user["Properties"]["sidhistory"]
-                )
+        generate_guest_user(session, self.domain, self.base_sid)
+        generate_default_account(session, self.domain, self.base_sid)
+        generate_administrator(session, self.domain, self.base_sid)
+        generate_krbtgt_user(session, self.domain, self.base_sid)
         
 
         print("Adding default User nodes to the domain")
@@ -620,7 +414,7 @@ class MainMenu(cmd.Cmd):
             danum, dapctint))
         das = random.sample(users, danum)
         for da in das:
-            session.run('MERGE (n:User {name:$name}) WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (n)-[:MemberOf]->(m)', name=da, gname=get_cn("DOMAIN ADMINS", self.domain))
+            session.run('MERGE (n:User {name:$name}) WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (n)-[:MemberOf]->(m)', name=da, gname=get_name("DOMAIN ADMINS", self.domain))
 
 
         print("Adding members to standard groups")
