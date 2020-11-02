@@ -8,7 +8,7 @@ def get_forest_default_groups_list(domain_name, domain_sid):
     return groups_list
 
 
-def get_forest_standard_group_members_list(domain_name, domain_sid):
+def get_forest_default_group_members_list(domain_name, domain_sid):
     forest_members_list = []
     groups_list = get_forest_default_groups_list(domain_name, domain_sid)
     for group in groups_list:

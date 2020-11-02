@@ -75,6 +75,18 @@ def generate_user(session, user):
     )
 
 
+def link_default_users_to_domain(session, domain_name, domain_sid):
+    standard_users_list = get_forest_user_sid_list(domain_name, domain_sid)
+    for user in standard_users_list:
+        add_contains_object_on_domain_relationship(session, user)
+
+
+def add_contains_object_on_domain_relationship(session, ad_object):
+        query = "MATCH (objectItem:" + ad_object["ObjectType"] + " {objectid: '" + ad_object["ObjectId"] + "'}), (domainItem:Domain {objectid: '" + ad_object["DomainId"] + "'})"
+        query = query + "\nMERGE (domainItem)-[:Contains]->(objectItem)"
+        session.run(query)
+
+
 def generate_users(session, domain_name, domain_sid, num_nodes, current_time, first_names, last_names, users, ridcount):
     user_properties_list = []
     group_name = "DOMAIN USERS@{}".format(domain_name)

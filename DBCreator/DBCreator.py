@@ -21,8 +21,6 @@ from collections import defaultdict
 import uuid
 import time
 
-from entities.groups import get_forest_standard_group_members_list
-from entities.users import get_forest_user_sid_list
 from entities.acls import get_standard_group_aces_list, get_standard_user_aces_list, get_standard_all_extended_rights,\
     get_standard_generic_write, get_standard_owns, get_standard_write_dacl, get_standard_write_owner,\
     get_standard_generic_all
@@ -35,8 +33,8 @@ from generators.acls import generate_enterprise_admins_acls, generate_administra
     generate_default_groups_acls
 from generators.computers import generate_computers, generate_dcs, generate_default_admin_to
 from generators.users import generate_guest_user, generate_default_account, generate_administrator, generate_krbtgt_user,\
-    generate_users
-from generators.groups import generate_groups
+    generate_users, link_default_users_to_domain
+from generators.groups import generate_groups, generate_domain_administrators, generate_default_member_of
 
 from templates.groups import WEIGHTED_PARTS
 
@@ -342,13 +340,9 @@ class MainMenu(cmd.Cmd):
         generate_default_account(session, self.domain, self.base_sid)
         generate_administrator(session, self.domain, self.base_sid)
         generate_krbtgt_user(session, self.domain, self.base_sid)
-        
 
         print("Adding default User nodes to the domain")
-        standard_users_list = get_forest_user_sid_list(self.domain, self.base_sid)
-        for user in standard_users_list:
-            self.add_contains_object_on_domain_relationship(session, user)
-        
+        link_default_users_to_domain(session, self.domain, self.base_sid)
 
         print("Generating User Nodes")
         user_properties_list, users, ridcount = generate_users(session, self.domain, self.base_sid, self.num_nodes, self.current_time, self.first_names, self.last_names, users, ridcount)
@@ -356,28 +350,13 @@ class MainMenu(cmd.Cmd):
         print("Generating Group Nodes")
         groups, ridcount = generate_groups(session, self.domain, self.base_sid, self.num_nodes, groups, ridcount)
 
-
-
         print("Adding Domain Admins to Local Admins of Computers")
         generate_default_admin_to(session, self.base_sid)
 
-        dapctint = random.randint(3, 5)
-        dapct = float(dapctint) / 100
-        danum = int(math.ceil(self.num_nodes * dapct))
-        danum = min([danum, 30])
-        print("Creating {} Domain Admins ({}% of users capped at 30)".format(
-            danum, dapctint))
-        das = random.sample(users, danum)
-        for da in das:
-            session.run('MERGE (n:User {name:$name}) WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (n)-[:MemberOf]->(m)', name=da, gname=get_name("DOMAIN ADMINS", self.domain))
+        das = generate_domain_administrators(session, self.domain, self.num_nodes, users)
 
-
-        print("Adding members to standard groups")
-        standard_group_members_list = get_forest_standard_group_members_list(self.domain, self.base_sid)
-        for group_member in standard_group_members_list:
-            query = "MATCH (memberItem:" + group_member["MemberType"] + " {objectid: '" + group_member["MemberId"] + "'}), (groupItem:Group {objectid: '" + group_member["GroupId"] + "'})"
-            query = query + "\nMERGE (memberItem)-[:MemberOf]->(groupItem)"
-            session.run(query)
+        print("Adding members to default groups")
+        generate_default_member_of(session, self.domain, self.base_sid)
         
 
 
@@ -817,12 +796,7 @@ class MainMenu(cmd.Cmd):
         query = "MATCH (identityReferenceItem:" + ad_object["IdentityReferenceType"] + " {objectid: '" + ad_object["IdentityReferenceId"] + "'}), (objectItem:" + ad_object["ObjectType"] + " {objectid: '" + ad_object["ObjectId"] + "'})"
         query = query + "\nMERGE (identityReferenceItem)-[:" + ad_object["Right"] + " {isinherited: " + str(ad_object["IsInherited"]) + "}]->(objectItem)"
         session.run(query)
-    
 
-    def add_contains_object_on_domain_relationship(self, session, ad_object):
-        query = "MATCH (objectItem:" + ad_object["ObjectType"] + " {objectid: '" + ad_object["ObjectId"] + "'}), (domainItem:Domain {objectid: '" + ad_object["DomainId"] + "'})"
-        query = query + "\nMERGE (domainItem)-[:Contains]->(objectItem)"
-        session.run(query)
 
 
 if __name__ == '__main__':
