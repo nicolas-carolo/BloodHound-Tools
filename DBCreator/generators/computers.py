@@ -50,4 +50,4 @@ def generate_dcs(session, domain_name, domain_sid, dcou, ridcount):
         session.run('MATCH (n:Computer {objectid:$sid}) WITH n MATCH (m:OU {objectid:$dcou}) WITH n,m MERGE (m)-[:Contains]->(n)', sid=sid, dcou=dcou)
         session.run('MATCH (n:Computer {objectid:$sid}) WITH n MATCH (m:Group {name:$gname}) WITH n,m MERGE (n)-[:MemberOf]->(m)', sid=sid, gname=get_name("ENTERPRISE DOMAIN CONTROLLERS", domain_name))
         session.run('MERGE (n:Computer {objectid:$sid}) WITH n MERGE (m:Group {name:$gname}) WITH n,m MERGE (m)-[:AdminTo]->(n)', sid=sid, gname=get_name("DOMAIN ADMINS", domain_name))
-    return dc_properties_list
+    return dc_properties_list, ridcount

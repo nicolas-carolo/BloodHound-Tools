@@ -22,8 +22,7 @@ import uuid
 import time
 
 from entities.groups import get_forest_standard_group_members_list
-from entities.users import get_guest_user, get_default_account, get_administrator_user, get_krbtgt_user,\
-    get_forest_user_sid_list
+from entities.users import get_forest_user_sid_list
 from entities.acls import get_standard_group_aces_list, get_standard_user_aces_list, get_standard_all_extended_rights,\
     get_standard_generic_write, get_standard_owns, get_standard_write_dacl, get_standard_write_owner,\
     get_standard_generic_all
@@ -35,7 +34,8 @@ from generators.ous import generate_domain_controllers_ou
 from generators.acls import generate_enterprise_admins_acls, generate_administrators_acls, generate_domain_admins_acls,\
     generate_default_groups_acls
 from generators.computers import generate_computers, generate_dcs
-from generators.users import generate_guest_user, generate_default_account, generate_administrator, generate_krbtgt_user
+from generators.users import generate_guest_user, generate_default_account, generate_administrator, generate_krbtgt_user,\
+    generate_users
 
 
 class Messages():
@@ -250,6 +250,7 @@ class MainMenu(cmd.Cmd):
             item = list(itertools.islice(it, size))
 
  
+    """
     def generate_timestamp(self):
         choice = random.randint(-1, 1)
         if choice == 1:
@@ -257,6 +258,7 @@ class MainMenu(cmd.Cmd):
             return self.current_time - variation
         else:
             return choice
+    """
 
  
     def generate_data(self):
@@ -325,7 +327,7 @@ class MainMenu(cmd.Cmd):
         computer_properties_list, ridcount = generate_computers(session, self.domain, self.base_sid, self.num_nodes, computers)
 
         print("Generating Domain Controllers")
-        dc_properties_list = generate_dcs(session, self.domain, self.base_sid, dcou, ridcount)
+        dc_properties_list, ridcount = generate_dcs(session, self.domain, self.base_sid, dcou, ridcount)
         # print(dc_properties_list)
 
 
@@ -346,42 +348,7 @@ class MainMenu(cmd.Cmd):
         
 
         print("Generating User Nodes")
-        current_time = int(time.time())
-        group_name = "DOMAIN USERS@{}".format(self.domain)
-        props = []
-        for i in range(1, self.num_nodes+1):
-            first = random.choice(self.first_names)
-            last = random.choice(self.last_names)
-            user_name = "{}{}{:05d}@{}".format(
-                first[0], last, i, self.domain).upper()
-            user_name = user_name.format(first[0], last, i).upper()
-            users.append(user_name)
-            dispname = "{} {}".format(first, last)
-            enabled = True
-            pwdlastset = self.generate_timestamp()
-            lastlogon = self.generate_timestamp()
-            ridcount += 1
-            objectsid = get_sid_from_rid(ridcount, self.base_sid)
-
-            user_property = {
-                'id': objectsid,
-                'props': {
-                    'displayname': dispname,
-                    'name': user_name,
-                    'enabled': enabled,
-                    'pwdlastset': pwdlastset,
-                    'lastlogon': lastlogon
-                }
-            }
-            props.append(user_property)
-            user_properties_list.append(user_property)
-            if (len(props) > 500):
-                session.run(
-                    'UNWIND $props as prop MERGE (n:Base {objectid:prop.id}) SET n:User, n += prop.props WITH n MATCH (m:Group {name:$gname}) WITH n,m MERGE (n)-[:MemberOf]->(m)', props=props, gname=group_name)
-                props = []
-
-        session.run(
-            'UNWIND $props as prop MERGE (n:Base {objectid:prop.id}) SET n:User, n += prop.props WITH n MATCH (m:Group {name:$gname}) WITH n,m MERGE (n)-[:MemberOf]->(m)', props=props, gname=group_name)
+        user_properties_list, ridcount = generate_users(session, self.domain, self.base_sid, self.num_nodes, self.current_time, self.first_names, self.last_names, users, ridcount)
 
         print("Generating Group Nodes")
         weighted_parts = ["IT"] * 7 + ["HR"] * 13 + \
